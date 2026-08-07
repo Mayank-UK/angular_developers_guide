@@ -1,0 +1,300 @@
+<div class="page">
+  <!-- 0. Mental model -->
+  <ui-section-wrapper title="Best practices — the mental model">
+    <ui-content-group-wrapper
+      title="Change detection is cheap, until it isn't"
+    >
+      <ui-text-block text="Angular walks the component tree on every change-detection pass, re-evaluating every template binding it reaches. For a typical component that is fine — a function call is cheap. The practices on this screen are not 'always do this'; they are 'reach for this when render becomes the problem'. The worst Angular code is over-optimised: a computed() wrapping a literal, OnPush on a leaf that never re-renders anyway, manual markForCheck where a signal would do. Write the clear version first, profile when something is actually slow (Angular DevTools Profiler tab), then apply the targeted fix. The throughline of every item below: a signal write is the change-detection trigger — OnPush just lets the rest of the tree opt out of work it didn't ask for." />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="This screen is the bar the rest of the app is held to"
+    >
+      <ui-text-block text="Each practice below is one this codebase already follows. Every component is standalone + OnPush + signals; dependencies arrive via inject(); routes are lazy loadComponent; every @for declares track; the DI seam keeps views free of DTO/DAO/HttpClient imports; const-object + literal-union replaces every place an older codebase would have used an enum. The do/don't pairs cite real do-examples from the app; the closing checklist is the gate any new code must clear before it ships." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.qualityBar"
+        [defaultOpen]="false"
+        caption="The quality bar — verify any new component against this list."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 1. OnPush + signals (the modern default) -->
+  <ui-section-wrapper title="OnPush + signals — the modern change-detection default">
+    <ui-content-group-wrapper
+      title="ChangeDetectionStrategy.OnPush, with signals as the CD trigger"
+    >
+      <ui-text-block text="OnPush tells Angular: 'do not check this component unless one of its inputs changed, a signal it reads wrote, or an event fired from inside it.' With signals, that contract is automatic — a signal write schedules change detection on exactly the components that read it, so an OnPush component that only reads signal inputs re-renders precisely when its data changes. No zone dependency, no markForCheck, no stale view. This is how EVERY component in this app is written (every view file opens with changeDetection: ChangeDetectionStrategy.OnPush), and it is the foundation every other practice on this screen builds on." />
+      <app-do-dont
+        title="OnPush + signals + computed — the whole pattern in one component"
+        prose="The do column is the canonical shape: OnPush + a signal source + a computed derivation + track in @for. The don't column is default CD + a mutable array mutated in place — nothing re-renders AND the whole tree gets checked anyway."
+        [doCode]="snippets.onpushDo"
+        [dontCode]="snippets.onpushDont"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. LIVE: OnPush vs default CD visualizer -->
+  <ui-section-wrapper
+    title="Live — OnPush vs default change detection"
+  >
+    <ui-content-group-wrapper
+      title="Click 'fire noise event' and watch which child re-renders"
+    >
+      <ui-text-block text="Two sibling children rendered by the same parent. Each carries a 'render count' that ticks every time Angular's change detection visits its template. The parent offers two buttons: 'bump value' (a signal write — the only thing either child reads) and 'fire noise event' (a click that triggers a CD pass over the whole tree WITHOUT changing the value). On the noise click the OnPush child's count stays flat — its input didn't change, so OnPush skipped it — while the default-CD child's count climbs on every click. On the value bump, both climb. That gap, multiplied across a real component tree on a busy page, is the entire case for OnPush + signals. (Render counting is a visualisation escape hatch — a method invoked from a template binding is re-evaluated on every CD visit — not a pattern to ship.)" />
+      <ui-example label="OnPush vs default change detection — render-count visualizer">
+        <app-cd-visualizer />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. track in @for -->
+  <ui-section-wrapper title="track in @for — the one rule that is never optional">
+    <ui-content-group-wrapper
+      title="Use a real id from the data; reach for $index only for stateless lists"
+    >
+      <ui-text-block text="When you render a list, Angular matches items between renders by their track expression. A stable id lets Angular reuse the DOM node and preserve the child component's state (input value, focus, animations) when the list reorders, filters, or mutates. track $index keys by POSITION, so deleting a middle row makes the rows below inherit the deleted row's component state — a correctness bug, not a perf tip. Angular REQUIRES a track expression in every @for (it is a build error without one), so the real failure mode is not 'forgot track', it is 'chose the wrong expression'. Use a real id; reach for $index only for pure presentational lists that hold no component state and never mutate." />
+      <app-do-dont
+        title="track with a stable id vs track $index"
+        prose="The do column keys by todo.id; the don't column keys by $index, which loses component state on any mutation."
+        [doCode]="snippets.trackDo"
+        [dontCode]="snippets.trackDont"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. LIVE: track comparison -->
+  <ui-section-wrapper title="Live — track $index vs track item.id">
+    <ui-content-group-wrapper
+      title="Type a note into each row, delete the middle row, watch the notes"
+    >
+      <ui-text-block text="Two lists rendered from the same source array, each with a different track expression. Type a unique note into each row, then delete one from the middle. The right column (track row.id) keeps each note with its row — the component instance is keyed by id, so deleting id=2 leaves id=3's note untouched. The left column (track $index) reuses the component instance at each position, so id=3's component (and its note) is now shown against id=2's data — the notes appear to 'shift up'. That is data loss caused entirely by the track expression." />
+      <ui-example label="track $index vs track item.id — state preservation on delete">
+        <app-track-comparison />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. OnPush + immutability -->
+  <ui-section-wrapper title="OnPush + immutability — produce new references">
+    <ui-content-group-wrapper
+      title="Mutating in place keeps the same reference; OnPush skips the update"
+    >
+      <ui-text-block text="OnPush checks a component only when an input reference changes (or a signal it reads writes, or an event fires in it). Mutating an array or object in place keeps the same reference, so an OnPush view does NOT re-render — you get a stale view with no error. Always produce a NEW reference: spread into a new array, map to new objects. This is why every signal update in this app uses .update() with a spread/map that returns a fresh value, and why the Signals, NgRx, and SignalStore todo demos never push/splice in place." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.immutability"
+        [defaultOpen]="true"
+        caption="New array + new object on every write — the OnPush contract."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Standalone components -->
+  <ui-section-wrapper title="Standalone components — no NgModules">
+    <ui-content-group-wrapper
+      title="imports on the component, not a shared module"
+    >
+      <ui-text-block text="A standalone component lists its dependencies (pipes, directives, child components) directly in its @Component imports. There is no NgModule to declare, export, or import; the component is its own unit. Standalone is what makes per-route lazy loading trivial (loadComponent returns one component, not a module graph), it tree-shakes better (unused imports are dropped per-component), and it is the only style this app uses — NgModules are left behind in modern Angular. The don't column shows the old ceremony: a module that declares + exports the component, which every consumer must then list in its own imports. More files, more indirection, worse lazy loading, for no benefit." />
+      <app-do-dont
+        title="Standalone component vs NgModule boilerplate"
+        prose="The do column is exactly how every component in src/app/views and src/ui/components is written."
+        [doCode]="snippets.standaloneDo"
+        [dontCode]="snippets.standaloneDont"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Lazy loading -->
+  <ui-section-wrapper title="Lazy loading — load screens on demand">
+    <ui-content-group-wrapper
+      title="loadComponent for one screen; loadChildren for a child route tree"
+    >
+      <ui-text-block text="A single-page app ships one bundle by default. Lazy loading splits a component into its own chunk loaded on first navigation, so a user only downloads the screens they actually visit. loadComponent returns one standalone component (the leaf case); loadChildren returns a child Routes array with its own nested <router-outlet> (the feature-area case). This app's entire route table in src/app/app.routes.ts is lazy loadComponent — every screen is its own chunk, and the initial bundle stays small. The don't column (an eager import + component: X) ships every screen in the initial bundle: no code splitting, the user downloads the whole app before they see the first page." />
+      <app-do-dont
+        title="Lazy routes vs eager imports"
+        prose="The do column is exactly how src/app/app.routes.ts is written — every route is a lazy loadComponent."
+        [doCode]="snippets.lazyDo"
+        [dontCode]="snippets.lazyDont"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. Signals vs RxJS -->
+  <ui-section-wrapper
+    title="Signals vs RxJS — which tool for which state"
+  >
+    <ui-content-group-wrapper
+      title="Signals for local state (~90%); RxJS for server state, events, orchestration"
+    >
+      <ui-text-block text="Signals are the built-in reactive primitive for holding ONE component's or a small subtree's state — plain values in the template, OnPush updates for free, no operator ceremony. Reach for a signal first. Reach for RxJS when you need what it is actually built for: asynchronous streams over time (HttpClient), multi-subscriber events, debouncing/combining/switching. The mistake is reaching for a BehaviorSubject + async pipe for a value only ONE component owns — you buy the ceremony without the power. This app's Signals / NgRx / SignalStore screens cover local + shared client state; the RxJS/server-state screen covers server state with HttpClient + interceptors. The do/don't below contrasts a signal-backed search box with the BehaviorSubject version of the same thing." />
+      <app-do-dont
+        title="Local search box: signal + computed vs BehaviorSubject + pipe"
+        prose="The do column is the Signals-screen pattern; the don't column works but pays RxJS's cost without its benefit."
+        [doCode]="snippets.signalsDo"
+        [dontCode]="snippets.signalsDont"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 9. Zoneless -->
+  <ui-section-wrapper
+    title="Zoneless change detection — the modern direction"
+  >
+    <ui-content-group-wrapper
+      title="provideZonelessChangeDetection: signals are the only CD trigger"
+    >
+      <ui-text-block text="The modern direction is zoneless change detection. With signals as the change-detection trigger, Angular no longer needs zone.js's monkey-patched event/timer/Promise hooks to know when to check — a signal write schedules the check itself. The wins are a smaller bundle (zone.js is gone), faster change detection, and fewer 'why did this re-render?' surprises, because every check is traceable to an explicit signal write. Going zoneless is a migration: every component must drive change detection from signals (or markForCheck + events), not rely on zone.js auto-detecting setInterval/XHR/Promise resolutions. This app is already written the zoneless-ready way — OnPush + signals everywhere — so flipping the provider on is the intended end state. Until then, the app runs zone-based but behaves identically because signal writes already drive every update." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.zoneless"
+        [defaultOpen]="true"
+        caption="provideZonelessChangeDetection() — provide once at the root."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 10. inject() over constructor -->
+  <ui-section-wrapper title="inject() over constructor injection">
+    <ui-content-group-wrapper
+      title="A readonly field initialiser that sits next to the signals"
+    >
+      <ui-text-block text="inject(TOKEN) as a readonly field initialiser reads cleanly next to signal fields (you see the component's whole state in one block, top to bottom), and it is the ONLY option in places that have no constructor of their own: functional HttpInterceptorFn, CanActivateFn / CanMatchFn / CanDeactivateFn, ResolveFn, and useFactory bodies. Classic constructor injection works, but it separates dependencies from the fields that use them and cannot be used in those functional contexts at all. Every component, directive, pipe, interceptor, guard, and resolver in this app uses inject()." />
+      <app-do-dont
+        title="inject() field vs constructor injection"
+        prose="The do column is how every class in this app resolves dependencies."
+        [doCode]="snippets.injectDo"
+        [dontCode]="snippets.injectDont"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 11. DestroyRef / takeUntilDestroyed -->
+  <ui-section-wrapper
+    title="ngOnDestroy → DestroyRef / takeUntilDestroyed"
+  >
+    <ui-content-group-wrapper
+      title="Teardown tied to the injection context, no interface, no subject"
+    >
+      <ui-text-block text="The modern replacement for the ngOnDestroy interface is DestroyRef: inject(DestroyRef) and register a callback with onDestroy(). The same lifetime guarantee, without implementing an interface, available anywhere with an injection context (including places ngOnDestroy never reached). For RxJS subscriptions the one-line form is takeUntilDestroyed() — pipe it in and the subscription auto-unsubscribes when the component's injection context is destroyed. The don't column shows the older ceremony: a Subject + takeUntil(subject) + a ngOnDestroy that fires and completes it. More code for the same guarantee, easy to forget on a new subscription, and the silent leak when you do. The Lifecycle screen covers the classic hooks (and notes signal inputs do NOT trigger ngOnChanges — react via computed/effect instead)." />
+      <app-do-dont
+        title="DestroyRef + takeUntilDestroyed vs ngOnDestroy + Subject"
+        prose="The do column is one line per subscription; the don't column is the boilerplate it replaces."
+        [doCode]="snippets.teardownDo"
+        [dontCode]="snippets.teardownDont"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 12. computed / memoised selectors -->
+  <ui-section-wrapper
+    title="computed() — the memoised selector (store the minimum, derive the rest)"
+  >
+    <ui-content-group-wrapper
+      title="Lazy + memoised + auto-tracking; one source of truth"
+    >
+      <ui-text-block text="computed() is the component-level memoised selector. It is lazy (runs only when read), memoised (returns the cached value until a source it reads changes), and auto-tracking (you don't write a dependency array — Angular records the signals you read). The rule is: STORE the minimum (the raw list + the filter), DERIVE everything else (the filtered list, the remaining count, the done count) via computed. This keeps one source of truth and guarantees the derivations never drift out of sync. The same rule applies at the store level — createSelector in NgRx and withComputed in SignalStore are the store-level analogues. The don't column shows the anti-pattern: storing the derived value in a separate signal and re-computing it by hand in every method — easy to miss a call site and ship a stale count." />
+      <app-do-dont
+        title="computed derivation vs hand-maintained derived signal"
+        prose="The do column is the Signals-screen + SignalStore-screen pattern; the don't column drifts the first time you forget a call site."
+        [doCode]="snippets.computedDo"
+        [dontCode]="snippets.computedDont"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 13. Avoiding CD loops + ExpressionChanged -->
+  <ui-section-wrapper
+    title="Avoiding change-detection loops and ExpressionChangedAfterItHasBeenChecked"
+  >
+    <ui-content-group-wrapper
+      title="Derive with computed; effects are side-effects, never derive in them"
+    >
+      <ui-text-block text="Two dev-mode errors come from breaking change detection's contract. (1) A change-detection loop: an effect writes a signal it also reads, so the write schedules another CD pass, which runs the effect, which writes again — Angular caps the cycle and throws. The fix is always structural: if the value can be derived, use computed (or linkedSignal for a writable derivation); reserve effect for side-effects that write NOTHING it reads (logging, analytics, persistence). (2) ExpressionChangedAfterItHasBeenChecked (NG0100): a value mutated during the same change-detection pass that read it — common when a child writes a parent's signal synchronously. Dev mode runs CD twice on purpose to surface this; the fix is to defer the write (queueMicrotask) or, better, restructure so the value is derived. The Debugging screen covers both in depth." />
+      <app-do-dont
+        title="Effect that only side-effects vs effect that writes a read signal"
+        prose="The don't column loops forever; the do column persists to localStorage and writes nothing it reads."
+        [doCode]="snippets.loopDo"
+        [dontCode]="snippets.loopDont"
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.ecaaic"
+        [defaultOpen]="false"
+        caption="ExpressionChangedAfterItHasBeenChecked — what triggers it and the fix."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 14. Typed forms + strict TS -->
+  <ui-section-wrapper title="Typed reactive forms + strict TypeScript">
+    <ui-content-group-wrapper
+      title="The generic flows field types into controls; strict TS catches typos"
+    >
+      <ui-text-block text="Angular's reactive forms are fully typed when you give FormGroup a generic (new FormGroup<LoginForm>({...})) and use nonNullable controls. The form's .value is then typed (Partial<LoginForm>), control names are checked at compile time, and setValue rejects the wrong type — a typo'd control name (emial) is a compile error instead of a silent runtime miss. This pairs with strict TypeScript across the project (strict: true in tsconfig, plus the erasable-only setting that bans enums in favour of const-object + literal-union). Strict TS catches a whole class of bugs at compile time that would otherwise surface as runtime NaNs, undefined-method calls, or wrong-shape data. Typed event handlers are part of the same discipline: (click) handlers take a typed MouseEvent, never any." />
+      <app-do-dont
+        title="Typed FormGroup vs untyped FormGroup"
+        prose="The do column's form.value is typed; the don't column's is any and a typo compiles."
+        [doCode]="snippets.formsDo"
+        [dontCode]="snippets.formsDont"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 15. const-object over enum -->
+  <ui-section-wrapper
+    title="const-object + literal union, NEVER enum"
+  >
+    <ui-content-group-wrapper
+      title="Erasable-only TypeScript compatibility, and a real type"
+    >
+      <ui-text-block text="This project bans enums. Every place an older codebase would have written enum TodoFilter { All, Active, Done }, this app writes a const-object plus its keyof literal union: const TODO_FILTERS = { All: 'all', Active: 'active', Done: 'done' } as const; type TodoFilter = (typeof TODO_FILTERS)[keyof typeof TODO_FILTERS]. That gives the same exhaustive type checking with one runtime value (the const-object is a real object you can iterate and index, unlike an enum which is an IIFE at the call site) and stays compatible with Angular's erasable-only TypeScript setting, which enums are not. The Signals, NgRx, and SignalStore screens' TODO_FILTERS, the EnvironmentName in core/config, and the FailureSeverity in core/error-handling all use this shape — it is the single type pattern across the app." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 16. Accessibility -->
+  <ui-section-wrapper title="Accessibility — not optional, and it makes tests better too">
+    <ui-content-group-wrapper
+      title="Semantic HTML is 90% of it; the rest is intent"
+    >
+      <ui-text-block text="Accessible UI is built from semantic HTML: a real <button> (not a div with (click)) gets keyboard focus, Enter/Space activation, and screen-reader announcement for free. <label> wraps its input (or links via for/id); headings form a real outline; images get alt text and decorative ones get alt=''; :focus-visible styling shows keyboard users where they are. The bonus: Testing Library and Angular's harnesses query by role and name, so writing accessible components makes them testable — getByRole('button', { name: 'Add' }) works precisely because the button is real and labelled. Conversely, a div-based 'button' is neither accessible nor queryable. The app's design-system tokens and the :focus-visible ring on every interactive primitive are the foundation; the practice is to use the right element." />
+      <app-do-dont
+        title="Real button + label vs div 'button' + placeholder"
+        prose="The do column works for keyboard, screen readers, and tests; the don't column fails all three."
+        [doCode]="snippets.a11yDo"
+        [dontCode]="snippets.a11yDont"
+        language="html"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 17. Maintainability — composition + the DI seam -->
+  <ui-section-wrapper
+    title="Maintainability — composition, single responsibility, the DI seam"
+  >
+    <ui-content-group-wrapper
+      title="Small components composed; one job each; data via inject(<token>)"
+    >
+      <ui-text-block text="A component that does one thing is reusable, testable, and readable; one that does five is none of those. Compose: build the screen from sections (SectionWrapper), sections from groups (ContentGroupWrapper), groups from primitives (TextBlock / CodeBlock / Example). Keep state as local as it can be (lift it only when two siblings need it; move to a store only when state is genuinely shared across distant components). Let the architecture's layers carry the cross-cutting concerns — a view resolves data via inject(GET_POSTS_USE_CASE), never an HttpClient/DTO/repository-impl import (the dependency rule the Architecture and API-handling screens enforce). The result, visible across every screen in this app, is that a new screen is mostly assembling existing pieces — not writing new ones. Multi-file primitives live in src/ui/components; single-screen helpers stay local to that screen's folder." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 18. Angular vs React-sibling -->
+  <ui-section-wrapper
+    title="Angular vs the React sibling — different runtimes, overlapping habits"
+  >
+    <ui-content-group-wrapper
+      title="Keys map to track; memoization maps to OnPush + signals; hooks map to lifecycle"
+    >
+      <ui-text-block text="• track in @for maps to React's key — same correctness rule (stable id, never index), same state-preservation failure mode when you break it.
+
+• React's useMemo / useCallback / React.memo have no single Angular analogue. Angular does not re-run function bodies on every render the way React does; it walks a component tree on change detection. The Angular answer is OnPush + signals + computed — opt OUT of the walk, then drive the opt-back-in from signal writes. The habits are more structural in Angular (OnPush is a decorator flag, not a per-call memo).
+
+• React's useEffect maps to Angular's lifecycle (effect / afterNextRender for the signals lifecycle, ngOnInit / ngOnChanges for the classic hooks). Same rule in both: synchronise external systems, always clean up (takeUntilDestroyed / DestroyRef is Angular's cleanup story), and never derive in an effect — derive with computed.
+
+• The DI seam is Angular-native (InjectionToken + providers + inject()) where the React sibling hand-rolls a Container; both enforce that a view depends on a contract, not a concrete source. The Architecture and Dependency-management screens cover this app's seam in depth.
+
+• Accessibility is identical — semantic HTML is the web's head start, and both stacks share it." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

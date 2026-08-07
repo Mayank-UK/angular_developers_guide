@@ -1,0 +1,163 @@
+<div class="page">
+  <!-- 0. Scoping banner: explain how Tailwind is loaded for THIS screen -->
+  <div class="scope-banner" role="note">
+    <span class="scope-dot">●</span>
+    <p>
+      Tailwind is loaded for <strong>this screen only</strong>: the Play CDN
+      <code>&lt;script&gt;</code> is attached in <code>ngOnInit</code> and
+      removed — along with every <code>&lt;style&gt;</code> it generates — in
+      <code>onDestroy</code> via <code>DestroyRef</code>. The rest of the app
+      keeps using its own <code>var(--…)</code> token design system. Trade-off:
+      while this screen is mounted the Play CDN is a runtime compiler that is
+      technically document-wide (Preflight, the base reset, is disabled on
+      load to spare the app's chrome). The moment you navigate away, the
+      script and its generated styles are gone.
+    </p>
+  </div>
+
+  <!-- 1. What is Tailwind? -->
+  <ui-section-wrapper title="What is Tailwind?">
+    <ui-content-group-wrapper title="Utility-first — compose, don't name">
+      <ui-text-block text="Tailwind is a utility-first CSS framework: instead of pre-designed components (.btn, .card) it gives you thousands of tiny single-purpose utility classes — p-4, flex, text-center, rounded-md, bg-indigo-600, hover:bg-indigo-700 — that you compose directly in the template to build any look. The payoff: you never switch between template and CSS files, never invent class names, and never accumulate dead CSS — the build scans your templates and generates only the utilities you actually used. The trade-off is longer class strings in your markup, which most teams decide is worth it (and mitigate by extracting repeated patterns into a component or @apply rule)." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.utilities"
+        caption="The everyday utility families: spacing, flex/grid, typography, color, radius/shadow."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: a card composed entirely from utilities">
+      <ui-text-block text="Every visual on this card — the padding, the row layout, the type scale, the colors, the rounded corners, the shadow and ring, the hover state on the buttons — is a utility class set directly in the template. There is no CSS file for this card. Tailwind's CSS is loaded by this view; the rest of the screen's chrome uses the app's own tokens, so the two systems visibly coexist." />
+      <ui-example label="Utilities tour — pure utility classes">
+        <app-tailwind-utilities-tour-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. Installing Tailwind in Angular + the scoping trade-off -->
+  <ui-section-wrapper title="Installing Tailwind in an Angular app">
+    <ui-content-group-wrapper title="Build-time (recommended), CDN, or scoped">
+      <ui-text-block text="There are three places Tailwind can come from, and they differ in blast radius and production fitness. (1) Build-time via the PostCSS plugin + @import 'tailwindcss' in src/styles.scss — the recommended setup for a real app: tree-shaken, fast, no runtime compiler. Tailwind v4 is config-less (no tailwind.config.js by default); v3 used @tailwind base/components/utilities directives and a config file. (2) The Play CDN <script> in index.html — fine for a quick prototype, NOT for production: it compiles utilities in the browser at runtime, which is large, slow, and global. (3) Scoped to a single route by attaching the CDN script in ngOnInit and removing it in onDestroy — what THIS screen does, so Tailwind never reaches the rest of this app's token-based UI." />
+      <ui-code-block
+        language="bash"
+        [code]="snippets.install"
+        caption="Build-time install (v4 config-less, with the v3 legacy shown for reference)."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.threeWays"
+        caption="Three strategies: PostCSS global, CDN global, or scoped via a script this component owns."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Clean-up is non-negotiable">
+      <ui-text-block text="The Play CDN is not just a <script> tag — it is a runtime compiler that observes the DOM and writes a generated <style> into <head> as classes appear. If you attach the script and only remove the script on destroy, that generated CSS (and its MutationObserver) outlives the screen and the utility classes leak app-wide. This view uses a MutationObserver on <head> to record every element the Play CDN appends while mounted, and onDestroy detaches the script AND every recorded addition — so navigating away from /ui/styling/tailwind truly removes every trace of Tailwind. The modern hook is DestroyRef.onDestroy (no ngOnDestroy boilerplate)." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. Utility class families -->
+  <ui-section-wrapper title="The utility class families">
+    <ui-content-group-wrapper title="Spacing — a single 0.25rem scale">
+      <ui-text-block text="Every spacing utility reads the same scale whose unit is 0.25rem (4px): p-1 = 0.25rem, p-2 = 0.5rem, p-4 = 1rem, p-8 = 2rem, and so on. The same numbers feed padding (p-*, px-*, py-*, pt-*…), margin (m-*, mx-*, my-*…), and flex/grid gaps (gap-*). Once you internalise the scale you can sketch layout in your head without opening a CSS file. This app's own --space-* tokens use the same 4-pixel rhythm, so the two scales line up exactly." />
+      <ui-example label="The p-0 … p-8 spacing ladder">
+        <app-tailwind-spacing-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Color — a curated palette per name">
+      <ui-text-block text="Tailwind ships a curated default palette: each color name (slate, indigo, emerald, amber, rose, …) comes with a fixed shade scale from 50 (lightest) to 950 (darkest). You address a color as a utility: bg-indigo-600 for a background, text-slate-500 for muted text, ring-rose-300 for a focus ring. This is where Tailwind and this app diverge most clearly: Tailwind's colors are hardcoded hex values baked into the build, while this app's colors are live CSS variables that re-point under [data-theme='dark']. (See the config section for how @theme inline bridges the two — mapping a Tailwind color name to a var(--…).)" />
+      <ui-example label="bg-{palette}-{shade} swatches">
+        <app-tailwind-color-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Typography, radius, shadow, ring">
+      <ui-text-block text="Beyond spacing and color, the everyday families are: typography (text-{xs|sm|base|lg|xl|2xl|3xl…}, font-{thin|medium|bold|black…}, leading-*, tracking-*, text-{left|center|right}); radius (rounded-sm, rounded-md, rounded-lg, rounded-xl, rounded-full); shadow (shadow-sm, shadow-md, shadow-lg, shadow-xl); and ring (ring-1, ring-2, ring-{palette}-{shade} — a ring is an outset outline that does not shift layout, ideal for focus). The utilities tour card above uses all of these; inspect it to see them composed." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. Responsive variants -->
+  <ui-section-wrapper title="Responsive variants">
+    <ui-content-group-wrapper title="sm:/md:/lg: — prefix per breakpoint">
+      <ui-text-block text="Prefix any utility with a breakpoint and it applies from that width UP (mobile-first). grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 means one column on mobile, two from 640px, three from 1024px — that single line is the whole responsive behaviour. The default breakpoints are sm 640, md 768, lg 1024, xl 1280, 2xl 1536 (all min-width). Variants stack freely: md:hover:text-indigo-700 means 'indigo-700 from the md breakpoint up, on hover'." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.responsive"
+        caption="Breakpoint prefixes are mobile-first min-width modifiers that stack with state variants."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: resize the window">
+      <ui-text-block text="This grid is grid-cols-1 sm:grid-cols-2 lg:grid-cols-3. Narrow your browser window and watch the columns reflow — 1 column below 640px, 2 from 640px, 3 from 1024px. No media-query CSS was written; the utility prefix is all there is to it." />
+      <ui-example label="Resize the window — responsive prefixes">
+        <app-tailwind-responsive-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. State variants -->
+  <ui-section-wrapper title="State variants">
+    <ui-content-group-wrapper title="hover:/focus:/active:/disabled:">
+      <ui-text-block text="A state-variant prefix scopes a utility to an element state: hover:bg-indigo-700 only applies the background on mouse hover; focus:ring-2 only draws the ring when the element has focus; active:scale-95 briefly shrinks a button while it is pressed; disabled:opacity-50 only applies when the disabled attribute is set. The full list covers pseudo-classes (hover, focus, active, visited, disabled, focus-within, focus-visible…), pseudo-elements (before, after, placeholder, selection…), and arbitrary selectors via the [selector]: bracket escape. Variants also stack with responsive prefixes (md:hover:…), so a single class string can encode 'indigo, but only on hover, only from md up'." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.state"
+        caption="hover:, focus:, active:, disabled: — and how they stack with responsive prefixes."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: interactive state variants">
+      <ui-text-block text="Hover the first button (it turns indigo-700) and click it (it scales to 95%). Focus the input (an indigo ring and border appear). Toggle the checkbox to disable the action button — the disabled:bg-slate-300 and disabled:cursor-not-allowed utilities take over the moment the disabled attribute is set, and un-apply the instant it is removed." />
+      <ui-example label="hover: / focus: / active: / disabled:">
+        <app-tailwind-state-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Flex / Grid interactive -->
+  <ui-section-wrapper title="Flex & grid — layout as utilities">
+    <ui-content-group-wrapper title="Swap the container's layout class">
+      <ui-text-block text="Layout in Tailwind is two primitives: flex (one-dimensional) and grid (two-dimensional). flex adds display:flex; flex-row / flex-col set the direction; items-*, justify-*, gap-* position children. grid adds display:grid; grid-cols-{n} sets the column count; gap-* the gutters. Pick a mode below and watch the same six tiles rearrange — the only thing changing is the container's utility classes." />
+      <ui-example label="flex vs grid — interactive container swap">
+        <app-tailwind-flex-grid-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. @apply, config, theming -->
+  <ui-section-wrapper title="@apply, config, and theming">
+    <ui-content-group-wrapper title="@apply — utilities inside a named class">
+      <ui-text-block text="@apply pulls utility classes into a regular CSS rule, so you can extract a genuinely repeated utility string into a named class without leaving Tailwind's scale. It is the escape hatch for the 'long className' criticism: define .btn-primary once with @apply rounded-md bg-indigo-600 px-4 py-2 … and reuse it. The guardrail is to reach for @apply only for real repetition — over-use puts you back at 'invented class names', which is exactly the problem Tailwind was meant to solve. @apply needs the build-time PostCSS pipeline; it does NOT work with the Play CDN this screen uses for its demos." />
+      <ui-code-block
+        language="scss"
+        [code]="snippets.apply"
+        caption="@apply extracts a repeated utility string into a named class. Build-time only."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Config & theming — v4 @theme vs v3 tailwind.config.js">
+      <ui-text-block text="Tailwind v4 is config-less by default: you add the PostCSS plugin, write @import 'tailwindcss', and customise through CSS via @theme. v3 used a tailwind.config.js with theme.extend instead. The block that matters for THIS app is @theme inline: each entry maps a Tailwind namespace (--color-*, --radius-*, --shadow-*, …) to a LIVE CSS variable, so the generated utility reads var(--…) at runtime. That is how you make bg-surface, text-on-surface, rounded-md, shadow-button-card read this app's own tokens — and therefore follow [data-theme='dark'] flips for free. With that mapping in place, Tailwind's authoring ergonomics and a token design system are not competing choices; they are the same system, authored differently." />
+      <ui-code-block
+        language="css"
+        [code]="snippets.config"
+        caption="v4 @theme inline maps Tailwind namespaces onto this app's var(--…) tokens. v3 equivalent shown too."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. Tailwind vs this app's token system -->
+  <ui-section-wrapper title="Tailwind vs this app's token system">
+    <ui-content-group-wrapper title="Utility-first authoring vs hand-written token classes">
+      <ui-text-block text="The honest comparison is not 'Tailwind vs tokens' — with @theme inline the two coexist (Tailwind utilities can read these exact tokens). The real choice is about AUTHORING: do you compose the look inline in the template with utilities (Tailwind's ergonomics — no class names to invent, no CSS files to maintain, only-used utilities ship), or do you write named component classes (.app-btn-primary) that consume var(--…) tokens directly (this app's current approach — one readable class per element, styling lives in SCSS)? This app deliberately takes the second route because its teaching point is the token architecture itself, and hand-written classes make the var(--…) consumption explicit and inspectable. A product team that had already absorbed the token lesson and wanted faster authoring would be perfectly correct to layer Tailwind on top via @theme inline — same tokens, different authoring surface." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.comparison"
+        caption="Same button, two authoring styles — both can consume the same tokens."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="When you would actually pick Tailwind">
+      <ui-text-block text="Tailwind shines when you want fast, consistent authoring without inventing class names, when your team is happy reading long utility strings in templates, and when you value shipping only the CSS you use. It pairs especially well with a component-based framework (Angular's standalone components) where repeated utility patterns can be hidden behind a reusable component. It is the wrong pick when the product's brand identity needs bespoke component CSS that does not decompose neatly into utilities, when the team finds long class strings unreadable, or — for the Play CDN specifically — when you need production performance (the build-time PostCSS plugin is the production answer; the CDN is for prototyping). This teaching app stays token-class-first to keep the var(--…) story front and centre; Tailwind is shown here so the contrast is concrete." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

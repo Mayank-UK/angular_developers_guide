@@ -1,0 +1,119 @@
+<div class="page">
+  <!-- Hero -->
+  <section class="hero">
+    <p class="kicker">Angular developer's guide</p>
+    <h2 class="headline">A reference app you read as much as you run.</h2>
+    <p class="lede">
+      A small, production-shaped Angular 22 application built to teach Angular by
+      <strong>visible example</strong> — every concept has a rendered live demo
+      next to its source. Mirrors the sibling react_developers_guide
+      concept-for-concept, picking the Angular-idiomatic answer wherever the two
+      ecosystems differ.
+    </p>
+
+    <div class="stats">
+      @for (s of stats; track s.label) {
+        <div class="stat">
+          <span class="stat-value">{{ s.value }}</span>
+          <span class="stat-label">{{ s.label }}</span>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- 1. What it is -->
+  <ui-section-wrapper title="What this app is">
+    <ui-content-group-wrapper title="A reference app, not a slide deck">
+      <ui-text-block text="This is a single-page Angular application built to be read as much as used. Every screen teaches one topic — Angular fundamentals, styling, state management, the data pipeline, testing, and so on — by implementing it for real in the same codebase you're looking at, then explaining the how and the why. The goal is not to list every API; it is to show the shape a maintainable Angular app takes, so the patterns are concrete rather than abstract.
+
+It is the sibling of a React guide (react_developers_guide). Both cover the same concepts; both reach for the idiomatic answer in their own ecosystem. Where React and Angular genuinely differ — dependency injection, change detection, state management primitives, routing model — each screen says so and uses the Angular-standard way, rather than forcing a React pattern onto Angular." />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper title="Teach by visible example">
+      <ui-text-block text="The rule this whole guide is built on: every concept ships a live, interactive demo alongside its source listing — not just a code block. Signals are a counter you can bump; OnPush is a render-count visualizer; the error pipeline is a button that injects a 503 and shows the Failure.chain trace it produces. Reading the code tells you what; running the demo shows you why. If a screen has no rendered example, it is not finished." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. What it covers -->
+  <ui-section-wrapper title="What it covers">
+    <ui-content-group-wrapper title="Six areas, each a working implementation">
+      <div class="coverage">
+        @for (c of coverage; track c.route) {
+          <a [routerLink]="c.route" class="coverage-card">
+            <span class="coverage-index">{{ c.index }}</span>
+            <span class="coverage-title">
+              {{ c.title }}
+              <span class="arrow">→</span>
+            </span>
+            <span class="coverage-note">{{ c.note }}</span>
+          </a>
+        }
+      </div>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. How it's built -->
+  <ui-section-wrapper title="How it's built">
+    <ui-content-group-wrapper title="Clean layers + a token-driven design system">
+      <ui-text-block text="The code separates concerns into four layers — domain (enterprise rules, framework-free), data (the implementations: remote, local, repositories), core (the shared kernel + the composition root + the error pipeline), and ui (presentation). Every dependency points inward toward the domain, so each layer can change, be swapped, or be tested without the others moving. The UI is built from a single design system of CSS-variable tokens, so the whole app reads as one system and themes light/dark by flipping a data-theme attribute on <html>.
+
+Cross-cutting concerns are first-class: a Result<T> type carries success-or-failure through the data layer; exceptions are converted to severity-tagged Failures at the boundary; Angular's native DI wires everything via InjectionTokens + providers and swaps real implementations for fakes per environment. The deep-dive screens (API handling, Database handling, Exception handling, Dependency management, Architecture) walk each of these layer by layer." />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper title="The error pipeline, in one breath">
+      <ui-text-block text="Engine error (HttpClient / IndexedDB) → typed AppException (data-layer, cause-chained) → Failure (domain/presentation, kind + severity + user message) → Result<T> (Success<T, warning?> | Failed). Two stages, not one: AppException says what broke; Failure says what to tell the user and how loudly. The UI reasons only about Failure.kind / severity and never imports HTTP concepts. The Exception-handling screen drives the whole pipeline live." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. The stack -->
+  <ui-section-wrapper title="The stack">
+    <ui-content-group-wrapper title="Deliberately standard, nothing exotic">
+      <ui-text-block text="Every dependency was chosen because it is the current idiomatic answer for its job in an Angular app, not because it is novel. That keeps the guide honest: what you read here is what you'd reach for shipping a real app today." />
+      <div class="stack">
+        @for (row of stack; track row.label) {
+          <div class="stack-row">
+            <span class="stack-label">{{ row.label }}</span>
+            <span class="stack-value">{{ row.value }}</span>
+          </div>
+        }
+      </div>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. How to run it -->
+  <ui-section-wrapper title="How to run it">
+    <ui-content-group-wrapper title="Docker-first — the host only needs Docker">
+      <ui-text-block text="All tooling (Node, Angular CLI, deps, the test runner) lives in Docker. There is intentionally no node_modules on the host — install, build, test, and serve all run inside the container. The dev image hot-reloads; the prod image is a two-stage nginx build running fully as the non-root nginx user." />
+      <ui-code-block
+        language="bash"
+        [code]="runCommands"
+        [defaultOpen]="true"
+        caption="From the project root — see README.md for the full workflow."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Conventions -->
+  <ui-section-wrapper title="Conventions it follows">
+    <ui-content-group-wrapper title="The habits that keep it readable">
+      <ui-text-block [text]="conventions" />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Credits -->
+  <ui-section-wrapper title="Credits & siblings">
+    <ui-content-group-wrapper title="Built to mirror the react_developers_guide">
+      <ui-text-block text="This Angular guide is one of a family of sibling developer guides that cover the same concepts in different ecosystems — the React guide is the original. Where the two align, naming and structure track each other so you can hop between them; where Angular has a native answer (DI, signals, HttpClient, functional interceptors), this app uses it instead of porting a React pattern.
+
+The architecture, the error pipeline, the token-driven design system, and the screen-per-topic layout are documented in ARCHITECTURE.md and README.md at the project root." />
+      <div class="credits">
+        <a class="credit-card" href="https://react.dev" target="_blank" rel="noopener noreferrer">
+          <span class="credit-title">react_developers_guide <span class="arrow">↗</span></span>
+          <span class="credit-note">The sibling guide this app mirrors — the same concepts in the React ecosystem.</span>
+        </a>
+        <a class="credit-card" href="https://angular.dev" target="_blank" rel="noopener noreferrer">
+          <span class="credit-title">Angular docs <span class="arrow">↗</span></span>
+          <span class="credit-note">The official Angular documentation, the canonical reference for every API used here.</span>
+        </a>
+      </div>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

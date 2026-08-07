@@ -1,0 +1,124 @@
+<div class="page">
+  <!-- 1. Angular event bindings -->
+  <ui-section-wrapper title="Angular event bindings">
+    <ui-content-group-wrapper title="The (event) grammar">
+      <ui-text-block text="Angular binds DOM events with the (event) grammar: (click), (input), (change), (keydown), (keyup), (focus), (blur) — anything the element dispatches. The right-hand side is a statement (a method call, a signal write, or an expression that mutates state), and the $event payload is typed automatically when Angular can infer it from the event name. This is the day-to-day interaction surface: you rarely need addEventListener or a HostListener in app code — the template binding is the standard, idiomatic way to react to user input." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.bindings"
+        caption="(click)/(input)/(change) and a strongly-typed $event handler."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. Click counter -->
+  <ui-section-wrapper title="Click counter — the canonical (click)">
+    <ui-content-group-wrapper title="A signal and two computed derivations">
+      <ui-text-block text="The simplest interactive Angular component: a button with (click) writes a signal, and two computed() values (double and parity) derive from it. The template reads count(), double(), parity() and stays in sync automatically — OnPush components re-render whenever a signal they read is written, so there is no manual change-detection call anywhere. increment/decrement/reset are plain methods; they could equally be inline signal writes in the template ((click)='count.set(0)') for one-liners." />
+      <ui-example label="Click counter — (click) drives signals">
+        <app-click-counter-demo />
+      </ui-example>
+      <ui-code-block
+        language="ts"
+        [code]="snippets.bindings"
+        caption="The binding grammar and the typed handler shape used across this screen."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. Event filtering -->
+  <ui-section-wrapper title="Event filtering & the typed $event">
+    <ui-content-group-wrapper title="(keyup.enter) and friends">
+      <ui-text-block text="Angular event bindings accept a filter: (keyup.enter) fires only when Enter is released, (keydown.escape) only on Escape, (click.shift) only when Shift is held during the click, and you can chain modifiers (keyup.control.z). The filter is part of the event name, not a magic attribute — it spares you an if (e.key === 'Enter') guard in every handler. For events Angular can't narrow for you, type $event yourself: a KeyboardEvent for keydown, an Event whose target you cast to HTMLInputElement for input. Never use any." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.filter"
+        caption="Filter syntax vs the manual guard it replaces."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. Template reference variables -->
+  <ui-section-wrapper title="Template reference variables (#ref)">
+    <ui-content-group-wrapper title="A handle to an element, no backing state">
+      <ui-text-block text="A template reference variable (#name) is a handle to the DOM element (or, via exportAs, to a directive/component) it's declared on. It's visible to siblings and ancestors in the same template and re-evaluates on every change-detection pass, so binding the ref's value into another node mirrors an input's current value with zero backing state in the class. Use refs for template-only shortcuts — passing a value into another binding, clearing a field, or reading a form's current state — and reach for a signal when the value needs to outlive the template (to feed a computed, an effect, or another component)." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.refs"
+        caption="#ref as a template-only handle, and exportAs onto a directive/component."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. Live echo: (input) signal AND #ref -->
+  <ui-section-wrapper title="Live echo — (input) + a template ref">
+    <ui-content-group-wrapper title="Two ways to read an input, side by side">
+      <ui-text-block text="One input, two readouts. The left reads a signal written by (input) — it is reactive, so it can feed computed (the uppercase here), effect, other components, and any OnPush consumer. The right reads #ref.value directly in the template — a plain DOM-property read that re-evaluates every change-detection pass, perfect when you have no need for backing state. Use the signal path by default; reach for a ref when the value is genuinely template-local." />
+      <ui-example label="Live echo — signal vs template ref">
+        <app-input-echo-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Keyboard events -->
+  <ui-section-wrapper title="Keyboard events — (keydown) + (keyup.enter)">
+    <ui-content-group-wrapper title="Every key vs. a filtered commit">
+      <ui-text-block text="(keydown) fires on every physical key with a KeyboardEvent payload, so the handler can read .key, .code, .altKey, .metaKey, and friends — useful for shortcuts, games, or showing the last key pressed. (keyup.enter) is the filtered form: Angular calls the handler only when Enter is released, which is exactly what you want for 'commit this field'. The two patterns compose — track every key for live UI, filter for the action that submits." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.keyboard"
+        caption="A typed KeyboardEvent handler plus an event-filtered commit."
+      />
+      <ui-example label="Keydown listener with Enter-to-commit">
+        <app-keydown-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Focus, blur & hover -->
+  <ui-section-wrapper title="Focus, blur & hover events">
+    <ui-content-group-wrapper title="Pointer and keyboard state, tracked as signals">
+      <ui-text-block text="(mouseenter)/(mouseleave) and (focus)/(blur) are the event side of :hover and :focus-visible. Use the CSS pseudo-classes for the visuals (always prefer :focus-visible for the keyboard-only focus ring); reach for the event bindings when you need the state in TypeScript — to drive a tooltip, log analytics, coordinate two elements, or render state the cascade can't express. Hover and focus are independent channels: a keyboard user gets focus, a pointer user gets hover, and accessible UI responds to both without conflating them." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.focus"
+        caption="Pointer + keyboard events written to signals."
+      />
+      <ui-example label="Hover & focus state (two boxes, keyboard-operable)">
+        <app-hover-focus-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. HostListener -->
+  <ui-section-wrapper title="HostListener — host-level DOM events">
+    <ui-content-group-wrapper title="When an interaction repeats, lift it into a directive">
+      <ui-text-block text="@HostListener attaches a listener to the host element (or, with a target prefix, to document or window) — it is the directive equivalent of a template (event) binding. Use it when an interaction is reused across elements: declare the selector once and every host that carries it gets the behaviour, instead of repeating (mouseenter)/(focus) in every template. Pair it with @HostBinding to wire a host property/attribute/style back to a value the directive owns. The directive below (rendered verbatim) tracks hover + focus on any host it sits on; the same decorator also handles document/window listeners, shown on the component itself for a global Escape shortcut." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.hostlistener"
+        caption="HoverTrackDirective: @HostListener + @HostBinding, plus a component-level window listener."
+        [defaultOpen]="true"
+      />
+      <ui-example label="HostListener directive on three hosts + a global shortcut">
+        <app-host-listener-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 9. Signals drive reactive interaction -->
+  <ui-section-wrapper title="Signals make interaction state reactive">
+    <ui-content-group-wrapper title="No manual change detection — signal writes schedule everything">
+      <ui-text-block text="This is the signals payoff for interaction state. Three independent interactions — a (change) select, an (input) range, and a (click) enable toggle — each write a signal. One computed reads all three and produces the monthly cost; an effect logs every recomputation. OnPush is trivial to hold because signal writes are exactly what Angular's reactive change detection tracks: when a signal a template read is written, the template re-renders, when a signal a computed read is written, the computed re-runs — no zone, no markForCheck, no ChangeDetectorRef plumbing. The legacy alternative (mutating a property and hoping zone.js notices, or hand-calling markForCheck in an OnPush component) is what signals replace." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.signals"
+        caption="Several interactions → signals → one computed → template reads it. That's the whole loop."
+        [defaultOpen]="true"
+      />
+      <ui-example label="Three interactions composed into one reactive total">
+        <app-reactive-signals-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

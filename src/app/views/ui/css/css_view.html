@@ -1,0 +1,157 @@
+<div class="page">
+  <!-- 1. How Angular styles components -->
+  <ui-section-wrapper title="How Angular styles components">
+    <ui-content-group-wrapper title="Global styles vs component styles">
+      <ui-text-block text="Angular draws a hard line between global styles and component styles. Global styles live in src/styles.scss (registered under 'styles' in angular.json) and load once at boot — they hold the design-system tokens, element resets, and the body default font/colour and nothing else. Everything else is component-scoped: each standalone component declares its own styles via styleUrl/styleUrls (external .scss) or the inline styles array, and those styles apply only to that component's template. This is the opposite of one giant global stylesheet — it's what keeps screens from fighting each other." />
+      <ui-code-block
+        language="scss"
+        [code]="snippets.global"
+        caption="src/styles.scss — the single global sheet. Tokens + resets only."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.component"
+        caption="Per-component styles via styleUrl (preferred) or inline styles."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. ViewEncapsulation -->
+  <ui-section-wrapper title="ViewEncapsulation — Emulated, ShadowDom, None">
+    <ui-content-group-wrapper title="Three modes of style isolation">
+      <ui-text-block text="Every component has an encapsulation mode. Emulated is the default: Angular rewrites the component's selectors with a unique _ngcontent attribute so they only match its own elements — no Shadow DOM, but visually leak-proof. ShadowDom uses the browser's real Shadow DOM: strongest isolation (outside CSS cannot reach in, inside CSS cannot reach out), at the cost of cascade inheritance stopping at the shadow boundary. None turns scoping off entirely — the component's styles are emitted into the document head unscoped and leak globally. Use Emulated; reach for ShadowDom when you genuinely need a sealed widget (a third-party card, a complex custom element); avoid None unless you have a deliberate reason." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.encapsulation"
+        caption="The three modes. The import is the only change needed."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: same class name, three isolation modes">
+      <ui-text-block text="Each child below styles a box with its own component-scoped rule. The first three boxes are unaffected by their siblings' rules. The leak detector at the bottom lives in the host's own template — only the None rule (emitted globally) can reach it, which is the visible cost of ViewEncapsulation.None." />
+      <ui-example label="Emulated vs ShadowDom vs None">
+        <app-encapsulation-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. How Angular scopes component styles -->
+  <ui-section-wrapper title="How Angular scopes component styles">
+    <ui-content-group-wrapper title="The _ngcontent attribute">
+      <ui-text-block text="Under Emulated encapsulation Angular injects a unique attribute (the _ngcontent-* you see in DevTools) onto every element in the component's template and a matching attribute selector onto every rule in its styles. Your authored .card { ... } becomes .card[_ngcontent-abc] { ... } at compile time — same specificity shape, but it only matches elements that carry that attribute, i.e. this component's own elements. This is why a class name in one component never collides with the same class name in another: they end up with different attribute suffixes." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.scoping"
+        caption="Authored selector → compiled attribute-qualified selector."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. SCSS / Sass -->
+  <ui-section-wrapper title="SCSS / Sass">
+    <ui-content-group-wrapper title="Sass is supported out of the box">
+      <ui-text-block text="Angular CLI bundles the Sass compiler. Set 'style': 'scss' and 'inlineStyleLanguage': 'scss' in angular.json (this app does) and every styleUrls/styleUrl file and every inline styles array is SCSS by default. You get variables (compile-time $vars, distinct from CSS custom properties which are runtime), the & parent selector (handy for BEM and state), @use modules, and @mixin/@include. Two things to keep straight: SCSS $vars are compiled away at build time; CSS custom properties (var(--…)) are live at runtime and drive the design system's dark-mode flip. Prefer custom properties for anything themeable." />
+      <ui-code-block
+        language="scss"
+        [code]="snippets.scss"
+        caption="A representative component .scss: $vars for compile-time, var(--…) for runtime, & for nesting."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. CSS custom properties — the design-system tokens -->
+  <ui-section-wrapper title="Custom properties — the design-system tokens">
+    <ui-content-group-wrapper title="The backbone of this app's theming">
+      <ui-text-block text="Custom properties (--name: value) are dynamic, inherited, and changeable at runtime via JS or a style binding. They are how this app themes light/dark: the same var(--color-primary) resolves to indigo-600 in light and indigo-400 in dark because [data-theme='dark'] overrides the token on <html>. Unlike SCSS $vars (which are gone after compile), CSS variables are live — change one and every consumer updates in the same frame. Read a token with var(--name) and pass a fallback (var(--name, #000)) for the case where it is unset." />
+      <ui-code-block
+        language="css"
+        [code]="snippets.tokens"
+        caption="src/ui/design-system/tokens.css — the contract every component consumes."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: set a token on a container, watch it inherit">
+      <ui-text-block text="Pick a hue; the host sets --demo-color on the tiles' container and both tiles read background-color: var(--demo-color). They update together because custom properties cascade and inherit — the same mechanism that flips the whole app's colours when the theme attribute changes." />
+      <ui-example label="Change a token, watch it propagate">
+        <app-custom-properties-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Selectors -->
+  <ui-section-wrapper title="Selectors">
+    <ui-content-group-wrapper title="Element, class, id, and combinations">
+      <ui-text-block text="Selectors target elements. Type selectors (h1) match by tag; class (.name) matches many; id (#name) matches one. Combinators refine: descendant (space), child (>), and chaining (.a.b means an element with BOTH classes). In practice classes are the workhorse — they're reusable and they avoid the specificity traps of ids. Angular's component-scoped styles mean a class written in one component never collides with the same name elsewhere, so you can keep class names short and meaningful without a global naming convention." />
+      <ui-code-block language="css" [code]="snippets.selectors" />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Cascade & specificity -->
+  <ui-section-wrapper title="The cascade & specificity">
+    <ui-content-group-wrapper title="Which rule wins?">
+      <ui-text-block text="When several rules target the same element, the cascade picks the winner by: (1) origin/importance (!important beats normal), (2) inline style attribute (beats every selector), (3) specificity — counted as three buckets (ids, classes/attrs/pseudo-classes, types/pseudo-elements), and (4) source order (later wins on ties). An id beats any number of classes; a class beats any number of types. Specificity is the reason this app avoids ids in CSS and reaches for var(--…) tokens via class-based rules: keep specificity flat and predictable." />
+      <ui-code-block
+        language="css"
+        [code]="snippets.specificity"
+        caption="Specificity buckets, ties, and the full precedence ladder."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: inline style beats class">
+      <ui-text-block text="The target always carries the primary class. Toggling adds an inline background-color, which overrides the class because inline styles sit above every selector in the cascade. This is why the design system reaches for class + token rather than scattering inline styles — but inline is correct when a value is genuinely dynamic at runtime (a user-picked colour, a computed offset)." />
+      <ui-example label="Inline style vs class">
+        <app-specificity-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. Pseudo-classes & pseudo-elements -->
+  <ui-section-wrapper title="Pseudo-classes & pseudo-elements">
+    <ui-content-group-wrapper title="State and generated content">
+      <ui-text-block text="A pseudo-class (single colon) styles an element based on state or position: :hover, :focus, :active, :disabled, :first-child. A pseudo-element (double colon) targets a piece of content — ::before/::after insert generated content, ::first-line styles the first line of text. They add interactivity and decoration without extra markup or JS: the browser tracks hover/focus state for you. Use :focus-visible (not :focus) for keyboard-only focus rings so mouse users don't see one. The interactive-behaviours screen goes deeper on event-driven state." />
+      <ui-code-block
+        language="css"
+        [code]="snippets.pseudo"
+        caption=":hover, :focus-visible, :active, :disabled, ::before, ::first-line."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: hover, focus, generated content, disabled">
+      <ui-text-block text="Hover the button, Tab to it for :focus-visible, click for :active. The leading glyph is ::before generated content. Toggle the second control to apply :disabled to the input." />
+      <ui-example label="State-based styles, no JS">
+        <app-pseudo-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 9. Modern CSS -->
+  <ui-section-wrapper title="Modern CSS">
+    <ui-content-group-wrapper title="Logical properties, clamp(), gap, nesting">
+      <ui-text-block text="Modern CSS removes the reasons teams used to reach for preprocessors and JS. Logical properties (padding-inline, margin-block-start, inset-inline-start) flip automatically with the document's writing direction — LTR vs RTL comes free. clamp(min, preferred, max) gives fluid scaling without media queries. gap works on flex and grid for space between items with no margin-collapse. And native CSS nesting (the & parent selector) ships in evergreen browsers and is bundled by the Angular CLI — no PostCSS plugin required." />
+      <ui-code-block
+        language="css"
+        [code]="snippets.modern"
+        caption="Logical properties, clamp(), gap, and native nesting."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: clamp() with a live preferred value">
+      <ui-text-block text="The slider sets the preferred value fed into clamp(1rem, var(--preferred), 3rem). Drag past either bound and clamp() holds the floor/ceiling — exactly how a fluid heading stays readable on a 320px phone and a 4K monitor with a single rule." />
+      <ui-example label="clamp(min, preferred, max)">
+        <app-clamp-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 10. Media + container queries (brief) -->
+  <ui-section-wrapper title="Media & container queries (brief)">
+    <ui-content-group-wrapper title="Adapt to viewport, or to a component">
+      <ui-text-block text="Media queries adapt styles to the viewport (@media (min-width: 768px)); container queries adapt to a component's own size (@container). Container queries are the modern answer to 'this card lays out differently whether it's in a sidebar or a full-width page' — set container-type: inline-size on the parent and query its inline width. The full reflow story — breakpoints, the auto-fit grid pattern, Tailwind/Bootstrap responsive grids — is its own screen; reach here for min()/max()/clamp() and the auto-fit grid first, and reserve explicit queries for cases those can't cover." />
+      <ui-code-block
+        language="css"
+        [code]="snippets.responsive"
+        caption="One-line refresher; see the Responsive screen for the full treatment."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

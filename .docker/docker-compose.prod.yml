@@ -1,0 +1,10 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .docker/Dockerfile.prod
+    image: angular_developers_guide-prod
+    container_name: angular_developers_guide-prod
+    restart: unless-stopped
+    ports:
+      - "80:8080"

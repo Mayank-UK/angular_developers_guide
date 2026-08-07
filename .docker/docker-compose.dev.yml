@@ -1,0 +1,17 @@
+name: angular_developers_guide
+
+services:
+  app:
+    build:
+      context: ..                          # project root is the build context
+      dockerfile: .docker/Dockerfile.dev   # path relative to context
+    image: angular_developers_guide-dev
+    container_name: angular_developers_guide-dev
+    restart: unless-stopped
+    ports:
+      - "4200:4200"
+    volumes:
+      - ..:/app                  # relative paths in volumes are relative to this compose file
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development

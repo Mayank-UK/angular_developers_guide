@@ -1,0 +1,144 @@
+<div class="page">
+  <!-- 1. The mental model -->
+  <ui-section-wrapper title="Responsive layout in Angular — the mental model">
+    <ui-content-group-wrapper title="Two layers: CSS first, Angular when CSS can't">
+      <ui-text-block text="Responsive layout in Angular is two layers composed. The first layer is CSS: mobile-first media queries, the repeat(auto-fit, minmax(...)) grid, clamp() fluid typography, viewport units, and container queries adapt the layout with zero TypeScript. This is always the first choice — it's cheaper, survives hydration, and works without Angular at all. The second layer is Angular: when CSS cannot express the branch (which component mounts, which data path runs, how many items to fetch), bridge the viewport into reactive state with a matchMedia-backed signal and let the template branch with @if/@switch. The signal is the seam between the two layers: CSS still drives the visuals, Angular decides the structural and data choices CSS can't reach." />
+      <ui-text-block text="Rule of thumb: if CSS can do it, let it. Reach for a matchMedia signal only when the viewport must change TypeScript behaviour — mounting a heavy component only on large screens, switching a data source, or hiding an interactive feature that doesn't make sense on a phone. Everything visual (reflow, re-layout, font scaling) belongs in CSS." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. Media queries (mobile-first) -->
+  <ui-section-wrapper title="Media queries — mobile-first">
+    <ui-content-group-wrapper title="Base rule first, min-width overrides after">
+      <ui-text-block text="A media query adapts styles to the viewport: @media (min-width: 768px) { … } applies its block only when the viewport is at least 768px wide. The standard approach is mobile-first: write the small-screen rule as the base, then layer min-width overrides in increasing order. The cascade does the work — each override only adds to the base, never undoes it, which keeps the stylesheet predictable and avoids the specificity churn of max-width-first authoring. Use this for layout shifts that are purely visual (column counts, padding, show/hide)." />
+      <ui-code-block
+        language="css"
+        [code]="snippets.mediaFirst"
+        caption="Mobile-first cascade: base rule, then min-width overrides."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. matchMedia signal utility -->
+  <ui-section-wrapper title="Bridging the viewport into Angular state">
+    <ui-content-group-wrapper title="A dependency-free matchMedia signal">
+      <ui-text-block text="CSS media queries adapt styles; they cannot choose which component mounts or which data path runs. For that, Angular needs the viewport in reactive state. The bridge is window.matchMedia — the same engine CSS uses, exposed to JavaScript as a MediaQueryList. Wrap it in a signal and you get a read-only value that updates when the query crosses its threshold, drives computed/effect, and re-renders any OnPush template that reads it. The helper below (rendered verbatim) is the whole surface area: a signal plus a listener cleaned up in DestroyRef.onDestroy. Cleanup is non-negotiable — a matchMedia listener survives the component, so without onDestroy the handler leaks and keeps the component's closure alive across navigations." />
+      <ui-text-block text="If you already depend on @angular/cdk, BreakpointObserver from @angular/cdk/layout is the canonical library option and integrates with RxJS. Reach for it then; otherwise a matchMedia signal is dependency-free and equivalent for app code. Both approaches are shown on this screen." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.mediaQueryFn"
+        caption="createMediaQuerySignal — the entire matchMedia → signal helper."
+        [defaultOpen]="true"
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.cdk"
+        caption="@angular/cdk/layout BreakpointObserver — the library equivalent."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. Live breakpoint readout -->
+  <ui-section-wrapper title="Live — viewport breakpoint readout">
+    <ui-content-group-wrapper title="Six matchMedia signals → one computed breakpoint">
+      <ui-text-block text="Each breakpoint is one matchMedia signal; a computed picks the largest min-width that currently matches. Resize the browser window: the active chip and the boolean ladder update in real time, with no resize listener and no zone involvement — every signal write is its own change-detection trigger. This is the pattern behind most responsive TS branches (current breakpoint, is-handset, is-tablet) and the foundation for the conditional rendering demo below." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.breakpointSignal"
+        caption="One signal per breakpoint, a computed for the current one."
+      />
+      <ui-example label="Resize the browser — the active breakpoint tracks live">
+        <app-breakpoint-readout-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. Conditional rendering with @if -->
+  <ui-section-wrapper title="Conditional rendering — @if off the signal">
+    <ui-content-group-wrapper title="React in TypeScript when CSS can't">
+      <ui-text-block text="This is the Angular layer's whole job. The matchMedia signal is read directly in the template: @if (isMobile()) renders a stacked hamburger menu below 768px; @else renders the full inline desktop bar. Because the signal write schedules change detection, the swap is instant and OnPush-safe — no ChangeDetectorRef, no zone. Use this pattern whenever the viewport must change which components exist, not just how they look: mounting a data-table vs a list, hiding a feature that doesn't apply on phones, or loading a different layout shell. The chips let you force each state without resizing the browser." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.conditional"
+        caption="Reading the matchMedia signal in @if to choose the component."
+      />
+      <ui-example label="Mobile vs desktop nav, branched in TypeScript">
+        <app-conditional-render-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. auto-fit + minmax grid -->
+  <ui-section-wrapper title="The auto-fit / minmax reflow grid">
+    <ui-content-group-wrapper title="Reflow in pure CSS, no media query">
+      <ui-text-block text="The single most useful responsive pattern: grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)). auto-fit creates as many tracks as fit on the line; minmax(140px, 1fr) floors each at 140px and grows the rest to fill leftover space. The grid reflows purely in CSS whenever its own width changes — no media query, no breakpoint ladder, no JavaScript. Drag the slider to resize the container (in production it would track the viewport); the live track count is read from the browser's own resolved grid template." />
+      <ui-text-block text="auto-fit vs auto-fill: auto-fit collapses empty tracks so children stretch across them; auto-fill keeps the tracks reserved. You almost always want auto-fit — auto-fill leaves visible gaps when there are fewer items than tracks." />
+      <ui-code-block
+        language="css"
+        [code]="snippets.autoFit"
+        caption="repeat(auto-fit, minmax(N, 1fr)) — reflows without a media query."
+      />
+      <ui-example label="Drag the container — tiles reflow, track count updates">
+        <app-autofit-grid-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Container queries -->
+  <ui-section-wrapper title="Container queries — layout follows the container">
+    <ui-content-group-wrapper title="Respond to a component's own box, not the viewport">
+      <ui-text-block text="A container query adapts layout to a component's container, not the viewport. A card laid out side-by-side in a full-width page stacks vertically when dropped into a sidebar — at the same window size. This is the modern answer to component-level responsiveness and pairs naturally with Angular's component model: each component owns its layout decisions independently of where it is mounted. Two pieces make it work: container-type: inline-size on a scope element establishes the query context, and @container (min-width: …) inside selects rules against that scope's inline width. Drag the slider below; the card flips between stacked and side-by-side at @container (min-width: 360px) while the viewport never moves." />
+      <ui-code-block
+        language="css"
+        [code]="snippets.container"
+        caption="container-type establishes the context; @container queries it."
+        [defaultOpen]="true"
+      />
+      <ui-example label="Shrink the container — the card relays-out (not the viewport)">
+        <app-container-query-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. Fluid typography with clamp() -->
+  <ui-section-wrapper title="Fluid typography — clamp()">
+    <ui-content-group-wrapper title="One rule that scales between two bounds">
+      <ui-text-block text="clamp(min, preferred, max) returns a value that scales with the preferred argument but never below min or above max. For typography, point the preferred value at a viewport unit (6vw here) and the floor/ceiling keep the result readable on the smallest phones and the largest desktops — replacing three or four media-query steps with a single declaration. The same trick works for spacing and layout values. Resize the browser; the live px readout is reported from the heading's own computed font-size." />
+      <ui-code-block
+        language="css"
+        [code]="snippets.clamp"
+        caption="clamp() for type, spacing, and capped widths with min()."
+      />
+      <ui-example label="Resize the window — the heading scales smoothly">
+        <app-fluid-typography-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 9. Viewport units -->
+  <ui-section-wrapper title="Viewport units — vw, vh, and the dvh story">
+    <ui-content-group-wrapper title="Sizes relative to the viewport (and the mobile-chrome fix)">
+      <ui-text-block text="Viewport units size things against the viewport: 1vw is 1% of the viewport width, 1vh is 1% of the viewport height. The catch is mobile browsers: 1vh is the LARGE viewport (the size with the URL bar hidden), so a 100vh hero overflows when the address bar is visible. The dynamic / small / large variants — dvh, svh, lvh — fix this. svh matches the smallest visible viewport (the safe default for full-height sections); dvh tracks the current viewport as the chrome shows and hides (best for UI that must hug the visible area); lvh is equivalent to legacy vh. Cap values with min() to avoid overflow on tiny screens." />
+      <ui-code-block
+        language="css"
+        [code]="snippets.viewport"
+        caption="vw/vh, the svh/dvh/lvh family, and capping with min()."
+      />
+      <ui-example label="Bars sized in vw / vh / dvh — resize the window's height">
+        <app-viewport-units-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 10. Bootstrap grid + Tailwind prefixes (brief) -->
+  <ui-section-wrapper title="Framework grids — Bootstrap & Tailwind (brief)">
+    <ui-content-group-wrapper title="The same breakpoints, packaged">
+      <ui-text-block text="Bootstrap and Tailwind package the same mobile-first min-width ladder into ready-made utilities. Bootstrap's 12-column grid (.container > .row > .col-{bp}-{span}) uses the same thresholds this screen uses (xs/sm/md/lg/xl/xxl) — apply .col-12 for phones and layer .col-md-6 .col-lg-4 for tablet and desktop in one element. Tailwind's responsive prefixes (sm:/md:/lg:/xl:/2xl:) are the same idea as utility classes: the unprefixed class is the mobile base and each prefix layers a min-width override. Both have full dedicated screens in this guide; this is the responsive recap. (Bootstrap screen / Tailwind screen)." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.frameworks"
+        caption="Bootstrap .col-{bp}-{span} and Tailwind responsive prefixes."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

@@ -1,0 +1,113 @@
+:host {
+  display: block;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* --------------------------------------------------------------------- */
+/* The centerpiece layered diagram — nested rings, inward dependency.    */
+/* --------------------------------------------------------------------- */
+
+.diagram {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--color-outline);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.ring {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  padding: var(--space-md);
+  border: 2px solid var(--color-outline);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-tint);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.ring:hover {
+  box-shadow: var(--shadow-button-card);
+}
+
+.ring-tag {
+  font-family: var(--font-mono);
+  font-size: var(--text-title-sm);
+  font-weight: 700;
+  color: var(--color-on-surface);
+}
+
+.ring-sub {
+  font-size: var(--text-caption);
+  color: var(--color-on-surface-variant);
+}
+
+/* Per-ring accent colors — each ring a distinct, token-driven tone. */
+.ring--ui {
+  border-color: var(--color-primary);
+}
+.ring--ui .ring-tag {
+  color: var(--color-primary);
+}
+
+.ring--data {
+  border-color: var(--color-secondary);
+  background: var(--color-surface);
+}
+.ring--data .ring-tag {
+  color: var(--color-secondary);
+}
+
+.ring--core {
+  border-color: var(--color-on-surface-variant);
+  background: var(--color-surface-tint);
+}
+
+.ring--domain {
+  border: 2px dashed var(--color-primary);
+  background: var(--color-surface);
+  text-align: center;
+  align-items: center;
+}
+.ring--domain .ring-tag {
+  color: var(--color-primary);
+}
+
+.arrows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  padding-top: var(--space-xs);
+  border-top: 1px dashed var(--color-outline);
+}
+
+.arrow {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  color: var(--color-on-surface-variant);
+}
+
+.arrow--seam {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* On narrow viewports the rings still nest but stay readable. */
+@media (max-width: 540px) {
+  .ring {
+    padding: var(--space-sm);
+  }
+  .ring-tag {
+    font-size: var(--text-body);
+  }
+}

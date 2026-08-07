@@ -1,0 +1,172 @@
+<div class="page">
+  <!-- 0. What and why -->
+  <ui-section-wrapper
+    title="Environments / flavours — the Angular way in this app"
+  >
+    <ui-content-group-wrapper title="Same code, different facts">
+      <ui-text-block text="An environment is the set of facts the app is built with: which API base URL to call, whether to wire the fake backend or the live one, whether to log, whether to inject failures for QA. The code is identical across environments — only those facts change. Keeping them apart lets you run the app locally against in-memory fakes (fast, offline, failure-injectable), exercise the real pipeline against a staging server (production-shaped but throwaway), and ship a stripped-down bundle to production. The rule: no environment-specific branches inside feature code — all of it reads from AppConfig, so 'which environment am I in?' has one answer, in one place." />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="Angular's mechanism: fileReplacements, not .env files"
+    >
+      <ui-text-block text="The React sibling of this app uses Vite's --mode to pick a .env.<mode> file. Angular does NOT. Angular swaps ONE TypeScript source file wholesale at build time: angular.json has a fileReplacements block per named configuration that replaces src/environments/environment.ts with environment.development.ts or environment.staging.ts. Each file exports the same 'environment' const with the SAME shape, just different values; core/config/createAppConfig turns it into a typed AppConfig; provideData(config) reads config.wiring to bind fake-vs-live sources. One --configuration flag selects the flavour; the entire DI graph re-wires with no view changes. There is no runtime env switch — the selected file's values are inlined into the bundle at build time." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 1. The three environment files -->
+  <ui-section-wrapper title="The three environment files, side by side">
+    <ui-content-group-wrapper
+      title="One file per flavour, same shape, different values"
+    >
+      <ui-text-block text="Each file exports a const named 'environment' with the identical shape — production, name, wiring { remote, db }, apiBaseUrl, scenario. The ONLY differences are the values. Production is the default (environment.ts); development and staging swap in via fileReplacements. Note how prod and dev both default to fakes today (with a comment showing where to flip to 'live'); staging already points at the live backend + real IndexedDB." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.envProd"
+        [defaultOpen]="true"
+        caption="src/environments/environment.ts — production default."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.envDev"
+        [defaultOpen]="true"
+        caption="src/environments/environment.development.ts — ng serve."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.envStaging"
+        [defaultOpen]="true"
+        caption="src/environments/environment.staging.ts — ng build --configuration staging."
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper title="Read the differences as policy">
+      <ui-text-block text="• dev uses fakes + failure injection so the whole error pipeline runs without a backend, and logs everything (production=false).
+• staging points at the real backend with the real HttpClient + real IndexedDB cache, still non-production so ScenarioService failure injection can run for QA.
+• production is the default file; it carries production=true (which gates optimization on, logs to error-only, and disables the NgRx devtools). Its wiring is currently fakes too so this teaching artifact's prod bundle runs offline — flip wiring.remote/wiring.db to 'live' before shipping against a real API." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. angular.json fileReplacements -->
+  <ui-section-wrapper
+    title="angular.json fileReplacements — the build-time swap"
+  >
+    <ui-content-group-wrapper
+      title="One configuration per flavour, each swapping one file"
+    >
+      <ui-text-block text="The build architect defines three configurations: production (the default, with NO fileReplacements block — environment.ts ships as-is), staging (which replaces environment.ts with environment.staging.ts), and development (which replaces it with environment.development.ts). The serve architect defaults to the development configuration, so 'ng serve' runs the dev file; the build architect defaults to production, so 'ng build' ships the prod file. fileReplacements is a STRING-LEVEL swap performed by the build before TypeScript compilation — the compiler sees exactly one environment.ts, and the others never reach the bundle." />
+      <ui-code-block
+        language="json"
+        [code]="snippets.angularJson"
+        [defaultOpen]="true"
+        caption="angular.json (trimmed) — the fileReplacements blocks per configuration."
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="Build flags select the flavour"
+    >
+      <ui-text-block text="Each --configuration value maps to a named configuration in angular.json, whose fileReplacements block decides which environment file gets compiled in. There is no separate CLI for environments — it is the same ng build / ng serve you always run, with one extra flag." />
+      <ui-code-block
+        language="bash"
+        [code]="snippets.buildFlags"
+        [defaultOpen]="true"
+        caption="Every way to pick a flavour."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. createAppConfig — the typed seam -->
+  <ui-section-wrapper
+    title="createAppConfig — the typed seam (config in, AppConfig out)"
+  >
+    <ui-content-group-wrapper
+      title="One function turns the raw record into a typed AppConfig"
+    >
+      <ui-text-block text="Every environment fact enters the app through ONE function: createAppConfig. It takes the raw object exported by the selected environment*.ts file, defensively copies the wiring/scenario (so they cannot be mutated after bootstrap), and returns a typed AppConfig. No other file reads the environment record directly — it reads inject(APP_CONFIG) instead. That keeps the 'where did this value come from?' answer to one place, and makes the config unit-testable (a spec passes a fake environment object). Pure TypeScript — no Angular import — so it runs in a Node test without TestBed." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.createAppConfig"
+        [defaultOpen]="true"
+        caption="src/core/config/index.ts — createAppConfig."
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="The AppConfig shape — const-object + literal union, NOT enum"
+    >
+      <ui-text-block text="EnvironmentName is a const-object + its keyof literal union (the project stays compatible with Angular's erasable-only TypeScript setting, so enums are off-limits). WiringConfig narrows remote/db to 'fake' | 'live' at the type level — a typo like 'fak' is a compile error, not a runtime surprise. The isDev/isStaging/isProd predicates carry the same logic without a switch statement. This is the typed contract every layer consumes; the environment files are just one way to produce one." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.appConfigType"
+        [defaultOpen]="true"
+        caption="src/core/config/app-config.ts — AppConfig + EnvironmentName."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. How wiring flips the DI graph -->
+  <ui-section-wrapper
+    title="How wiring flips the DI graph — fake vs live"
+  >
+    <ui-content-group-wrapper
+      title="provideData reads ONE field and re-wires everything"
+    >
+      <ui-text-block text="provideData(config) is where the environment meets the dependency graph. It reads config.wiring.remote and config.wiring.db, picks FakeApiService vs PostApiService and FakeAppDatabase vs AppDatabaseImpl, and binds the POST_REPOSITORY and GET_POSTS_USE_CASE tokens through factories. So flipping one field in an environment file — wiring.remote: 'fake' → 'live' — and rebuilding re-wires the entire graph from in-memory fakes to a live REST + IndexedDB backend. Not a single view changes; the tokens abstract which concrete class fills each slot. HttpClient is intentionally NOT provided here: the fake path needs no HTTP, and the live path consumes provideHttpClient(withInterceptors([retryInterceptor])) registered alongside it in app.config.ts." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.provideData"
+        [defaultOpen]="true"
+        caption="src/data/providers.ts — the fake-vs-live swap driven by config.wiring."
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="Bootstrap wires it once"
+    >
+      <ui-text-block text="app.config.ts calls createAppConfig(environment) — reading whichever file angular.json's fileReplacements selected — and hands the result to provideData, which registers the result against the root injector. By the time any component mounts, every token is resolvable. There is no manual container.initialize() (the React sibling's step); Angular's bootstrapApplication IS the initialization." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.bootstrap"
+        [defaultOpen]="true"
+        caption="src/app/app.config.ts + src/main.ts — the root providers list."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. Flavour → file → wiring table (interactive) -->
+  <ui-section-wrapper title="Pick a build command — see the file + wiring it selects">
+    <ui-content-group-wrapper
+      title="The whole mechanism on one page"
+    >
+      <ui-text-block text="Click a build command below to see which environment file its configuration's fileReplacements block swaps in, and the resulting AppConfig values that createAppConfig would produce. The data mirrors the REAL src/environments/environment*.ts files verbatim. The live inspector in the next section proves the swap actually reached runtime in THIS build." />
+      <ui-example label="flavour picker — file → wiring per build command">
+        <app-env-flavour-picker />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. LIVE inspector -->
+  <ui-section-wrapper title="Live — the runtime environment inspector">
+    <ui-content-group-wrapper
+      title="inject(APP_CONFIG) at runtime — proving fileReplacements worked"
+    >
+      <ui-text-block text="This readout is LIVE. It resolves the REAL APP_CONFIG token through the DI graph bound in app.config.ts and prints the current flavour's name, production flag, wiring (remote + db), apiBaseUrl, and the full scenario block. Because 'ng serve' runs the development configuration by default, visiting this screen while developing shows 'dev / fake'. Build with --configuration staging and serve that bundle and the same component reads 'staging / live' — same code, same token, only the file Angular swapped in changed. That is the fileReplacements mechanism proven end-to-end." />
+      <ui-example label="runtime APP_CONFIG readout — live">
+        <app-env-inspector />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Angular vs Vite vs Flutter -->
+  <ui-section-wrapper
+    title="Angular fileReplacements vs Vite --mode vs Flutter --flavor"
+  >
+    <ui-content-group-wrapper
+      title="Same goal (same code, per-environment facts), different mechanism"
+    >
+      <ui-text-block text="The goal — one codebase, per-environment facts — is identical across the three stacks this guide references. The mechanism differs sharply. Angular swaps a TypeScript file wholesale at build time (a string-level replace before compilation); Vite loads a .env.<mode> file and exposes only VITE_-prefixed vars to import.meta.env; Flutter typically uses separate entrypoints (main_dev.dart, main_staging.dart, main_prod.dart) plus native flavours (Android applicationId suffixes, iOS schemes), which is more moving parts per environment because there is a native layer. Crucially, none of these protects a client-bundled secret — anything inlined into the JS the browser downloads is public. Real secrets belong behind a backend." />
+      <ui-code-block
+        language="text"
+        [code]="snippets.contrast"
+        [defaultOpen]="false"
+        caption="Three stacks, one goal."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

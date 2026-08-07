@@ -1,0 +1,9 @@
+<a [routerLink]="item().route" class="card">
+  <h3 class="title">
+    {{ item().title }}
+    <span class="arrow">→</span>
+  </h3>
+  @if (item().description) {
+    <p class="desc">{{ item().description }}</p>
+  }
+</a>

@@ -1,0 +1,126 @@
+<div class="page">
+  <!-- 0. When to use — the hub's framing -->
+  <ui-section-wrapper title="When to reach for NgRx Store (global client state)">
+    <ui-content-group-wrapper title="The heaviest tool — earn it">
+      <ui-text-block text="This screen is the GLOBAL CLIENT state answer to the state-management hub's question: which state are you managing? NgRx Store is Angular's Redux: ONE immutable state tree for the whole app, ONE way to change it (dispatch a plain, serialisable action that flows through a pure reducer), read via memoised selectors. That is a lot of ceremony next to a signal — and it should be. Reach for it when the app is LARGE, many distant components share the same client state, you want middleware (effects for async) and the time-travelling Redux Devtools, and a team values a strict, auditable history of every change. For a handful of shared values, prefer the SignalStore sibling; for server data, the RxJS / server-state sibling. The same todo you built with a signal on the previous screen is rebuilt here on a real store — compare the two to feel the trade-off." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.when"
+        caption="The hub's decision rule, in code: store only when state is genuinely global and complex."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 1. Mental model — one store, one-way data flow -->
+  <ui-section-wrapper title="Mental model — one store, one-way data flow">
+    <ui-content-group-wrapper title="State lives in the store, not in components">
+      <ui-text-block text="The store holds a single tree (here { todos: [...], filter: 'all' }). Components READ slices of it with selectors and never keep a copy. To change anything you dispatch an action; the reducer decides the next state; every subscribed component re-renders with the new slice. Data flows one way — view → dispatch → reducer → new state → selectors → view — which is what makes NgRx predictable and replayable. The devtools can scrub back through every action because each one is a serialisable plain object. Side-effects (HTTP, localStorage) live in effects, NEVER in the reducer — the reducer must be a pure function." />
+      <ui-code-block
+        language="text"
+        [code]="snippets.flow"
+        caption="The unidirectional loop. State in one place; one way in (dispatch); pure reducer; memoised selectors back out."
+        [defaultOpen]="true"
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.store"
+        caption="provideStore + provideEffects + provideStoreDevtools in app.config.ts — wired app-wide, inert until actions dispatch."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. Actions — createActionGroup -->
+  <ui-section-wrapper title="Actions — describe what happened">
+    <ui-content-group-wrapper title="Plain serialisable objects; the only input to the store">
+      <ui-text-block text="An action is a plain object with a type string and an optional payload. It DESCRIBES something that happened ('Todo #4 was toggled') but never HOW to handle it — that is the reducer's job. Because actions are serialisable, the devtools can record and replay them, and your tests can assert against pure inputs. Modern NgRx uses createActionGroup, which bundles a feature's action creators in one typed object; each event becomes a creator whose type is auto-namespaced ('[Todos] Add Todo'). Payloads are declared with props(); event-less actions use the empty Record. The component never builds an action object by hand — it calls a creator." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.actions"
+        caption="createActionGroup — typed action creators, auto-namespaced types, payload bags via props()."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. Reducer — createReducer (pure, immutable) -->
+  <ui-section-wrapper title="Reducer — a pure (state, action) => state function">
+    <ui-content-group-wrapper title="The single place state is computed">
+      <ui-text-block text="The reducer is the only place store state is computed. It MUST be pure: no side-effects, no Date.now(), no Math.random(), no HTTP — given the same inputs it always returns the same output, which is what makes the store replayable and testable. createReducer(initialState, on(action, handler)...) returns a reducer function; each on handler returns a NEW state object, producing new arrays via spread / map / filter. Never mutate — the store needs a new reference to know anything changed (NgRx offers ngrx-immer for 'mutate' syntax, but the immutable form is the dependency-free baseline taught here). One reducer per feature; register it under a feature key in provideStore." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.reducer"
+        caption="createReducer + on — pure handlers, immutable updates, one feature slice."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. Selectors — createSelector (memoised) -->
+  <ui-section-wrapper title="Selectors — memoised read functions">
+    <ui-content-group-wrapper title="Components never reach into raw state by hand">
+      <ui-text-block text="A selector is a memoised pure function of the store: it caches its last result and only recomputes when the slice it depends on actually changes. createSelector(...inputSelectors, projector) builds one — inputs are other selectors, the projector receives each input's latest value and returns the derived one. Selectors compose: the visible list and every count below are built from selectTodos and selectFilter, never duplicated. That memoisation is what keeps OnPush components cheap — store.selectSignal(selector) reads the cached value and only schedules change detection when the cached value moves. STORE the minimum, DERIVE the rest — the same rule as computed in the Signals screen, expressed at the store level." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.selectors"
+        caption="createSelector — memoised, composable. selectTodos + selectFilter → selectVisibleTodos."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. The centerpiece — the live todo app on a REAL store -->
+  <ui-section-wrapper title="Live — the todo app powered by a real NgRx store">
+    <ui-content-group-wrapper title="selectSignal reads, dispatch writes">
+      <ui-text-block text="The centerpiece. A complete, working todo application reading from the REAL app-wide NgRx store wired in app.config.ts. The component holds NO todo state itself — every value (the visible list, the counts, the active filter) is a selector read via store.selectSignal(...), so OnPush updates automatically with zero change-detection plumbing. Adding, toggling, clearing, and filtering each dispatch an action; the reducer produces the next state; the selectors re-derive; the view re-renders. The action log below the list is a live tap on the Actions stream — watch each intent flow through before the reducer runs. This is the unidirectional data flow, live." />
+      <ui-example label="Add, toggle, filter all/active/done, clear done — state is in the store, not the component">
+        <app-ngrx-todo-demo />
+        <app-ngrx-action-log />
+      </ui-example>
+      <ui-code-block
+        language="ts"
+        [code]="snippets.component"
+        caption="inject(Store) + selectSignal (read) + dispatch (write). The component holds no todo state."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Effects — side effects live at the edges -->
+  <ui-section-wrapper title="Effects — side-effects live at the edges">
+    <ui-content-group-wrapper title="Keep the reducer pure; talk to the outside world here">
+      <ui-text-block text="Anything that touches the outside world — HTTP, localStorage, logging, debouncing — belongs in an effect, never in the reducer. An effect is a class field: an RxJS pipeline built with createEffect that listens to the Actions stream (filtered with ofType) and either dispatches a follow-up action or, with { dispatch: false }, performs a fire-and-forget side effect. The two effects below form the canonical persistence pair: loadTodos$ hydrates from localStorage on init (dispatching todosLoaded), and persistTodos$ writes the list back out after every mutation. withLatestFrom(this.store.select(...)) pairs the action with the current store value — the reducer has already run by the time an effect fires, so the latest state is one read away." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.effects"
+        caption="createEffect + ofType — hydrate on init (dispatches) and persist on mutation (dispatch: false)."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. DevTools -->
+  <ui-section-wrapper title="Redux DevTools — time-travel debugging">
+    <ui-content-group-wrapper title="The killer feature of the pattern">
+      <ui-text-block text="provideStoreDevtools instruments the store so the Redux DevTools browser extension can inspect every dispatched action, the diff it produced, and a slider to replay state backwards and forwards — 'time-travel debugging'. Because every change is a serialisable action, the whole history is reconstructable. Install the extension, open it on this page, and dispatch a few todos in the demo above: each '[Todos] …' action appears with its payload and the state snapshot before and after. In production builds, logOnly locks the panel to inspect-only so the overhead never ships." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.devtools"
+        caption="provideStoreDevtools — maxAge retains recent actions; logOnly keeps prod cheap."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. One-pager + when NOT to use -->
+  <ui-section-wrapper title="The four pieces, and when NOT to use NgRx">
+    <ui-content-group-wrapper title="Actions / Reducer / Selectors / Effects — and the lighter alternatives">
+      <ui-text-block text="The whole pattern in four nouns: ACTIONS (plain serialisable objects describing what happened, built with createActionGroup — the only input to the store); REDUCER (a pure (state, action) => state function, built with createReducer + on — the only place state is computed); SELECTORS (memoised read functions, built with createSelector — components read them via store.selectSignal); EFFECTS (RxJS pipelines over the Actions stream, built with createEffect + ofType — where side-effects live so the reducer can stay pure). When NOT to use it: for a single component's state (use signals), for a handful of shared values across a small app (use NgRx SignalStore — the next screen), or for server data (use HttpClient + RxJS). NgRx Store earns its keep at scale — large app, many shared slices, async middleware, a team that values an auditable history." />
+      <ui-code-block
+        language="text"
+        [code]="snippets.onepager"
+        caption="Actions / Reducer / Selectors / Effects — the four pieces on one page."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

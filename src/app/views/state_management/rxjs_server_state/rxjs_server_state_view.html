@@ -1,0 +1,146 @@
+<div class="page">
+  <!-- 0. When to use — the hub's framing -->
+  <ui-section-wrapper title="When to reach for RxJS + HttpClient (server state)">
+    <ui-content-group-wrapper title="The server-state answer to the hub's question">
+      <ui-text-block text="This screen is the SERVER-state answer to the state-management hub's question: which state are you managing? The first three siblings (Signals, NgRx Store, NgRx SignalStore) held state the app OWNS. This screen holds state the app BORROWS from a server: lists, records, search results — data that is asynchronous (loading matters), can fail (errors matter), and can change on the server while you hold it (staleness + caching matter). HttpClient + RxJS is Angular's native toolkit for that: one verb per REST operation, Observables for the async stream, interceptors for cross-cutting transport concerns, and operators (switchMap / retry / catchError / shareReplay) for caching, retries, and error handling. A signal or a store is the wrong tool for server state — they cache a value you already own; for server state you want a cache keyed by request, with explicit invalidation on writes." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.when"
+        caption="The hub's decision rule: signal first, store only when shared, RxJS for server caches."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 1. HttpClient — the verbs -->
+  <ui-section-wrapper title="HttpClient — GET / POST / PUT / DELETE">
+    <ui-content-group-wrapper title="One verb per REST operation, returning Observables">
+      <ui-text-block text="HttpClient is Angular's built-in HTTP client. Each method (get / post / put / patch / delete) maps to a REST verb and returns an Observable of the deserialized body — typed via generics, so the response is statically typed at the call site. An Observable is a LAZY stream: nothing fires until you subscribe (or hand it to toSignal / the async pipe). That laziness is what lets operators compose — retry, switchMap, shareReplay all hang off the same pipe. The service below wraps the four CRUD verbs against /api/todos; it is exactly the shape the todo demo on this page uses." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.client"
+        caption="A transport service: HttpClient.get/post/put/delete → Observable<T>."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. Functional interceptors -->
+  <ui-section-wrapper title="Interceptors — the functional HttpInterceptorFn style">
+    <ui-content-group-wrapper title="Functions, not classes — withInterceptors([fn])">
+      <ui-text-block text="Modern Angular interceptors are FUNCTIONS, not classes. A functional interceptor is a plain (req, next) => Observable — no @Injectable, no HTTP_INTERCEPTORS multi-provider, no implements HttpInterceptor boilerplate. Register them with withInterceptors([fn]) inside provideHttpClient(...). The function runs inside an injection context, so inject(...) works inside it (used below to reach this screen's on-screen request log). Interceptors run in array order — the first is the outermost, wrapping the rest; its next(req) calls into the next interceptor in the chain. The canonical example in THIS app is retry.interceptor.ts (data/remote/) — idempotent-only, exponential full-jitter, never retries errors that are already typed AppExceptions." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.fnInterceptor"
+        caption="A functional logging interceptor: tap the response stream, inject a log sink."
+        [defaultOpen]="true"
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.realRetry"
+        caption="This app's REAL retry interceptor (data/remote/retry.interceptor.ts) — the canonical example."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. The demo interceptor — fake /api/todos -->
+  <ui-section-wrapper title="The demo interceptor — a fake /api/todos so the demo runs offline">
+    <ui-content-group-wrapper title="Component-scoped, never affects the rest of the app">
+      <ui-text-block text="To make the todo demo work without a backend, this screen ships a functional interceptor that INTERCEPTS requests to /api/todos and returns canned responses (an in-memory list with simulated latency, and a fail-mode that throws 503s to demonstrate error handling). Crucially, it is registered ONLY in the TodoDemo component's providers via provideHttpClient(withInterceptors([loggingInterceptor, demoApiInterceptor])) — so it never touches the app's global HttpClient wiring (provideHttpClient(withInterceptors([retryInterceptor])) in app.config.ts). That component-scoped layering is the key trick: a fresh HttpClient for this subtree, layered with demo-only interceptors, while the rest of the app keeps its real transport. In a real app this file would not exist — requests would hit the network; this is purely a teaching fixture." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.demoInterceptor"
+        caption="demoApiInterceptor — short-circuits /api/todos with canned responses + latency."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. CENTERPIECE: the live todo app -->
+  <ui-section-wrapper title="Live — todos from a server (loading / error / data)">
+    <ui-content-group-wrapper title="Every read is a query; every write is a mutation then a refetch">
+      <ui-text-block text="The centerpiece. A complete, working todo application whose source of truth lives on the (simulated) server. Every read is an HttpClient GET, bridged to a signal via toSignal so the OnPush template reacts with no async pipe and no manual subscribe. Every write (add / toggle / delete) is a POST / PUT / DELETE followed by a refetch — the server truth is always what is rendered. The state machine is loading → (success | error): a loading spinner while the request is in flight, a retryable error banner on failure, and the list on success. Flip 'force server errors' to see the error path (the pipeline retries 5xx twice with backoff before surfacing catchError). The on-screen HTTP request log — written by the loggingInterceptor — shows every call, its status code, and the latency, including the retry attempts." />
+      <ui-example label="Loading / error / data states + an on-screen HTTP request log">
+        <app-rxjs-todo-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. toSignal vs async pipe -->
+  <ui-section-wrapper title="toSignal — Observable → signal (and the async-pipe alternative)">
+    <ui-content-group-wrapper title="Two ways to land a stream in the template">
+      <ui-text-block text="toSignal converts an Observable into a signal. It subscribes for you, ties the subscription to the component's lifetime, requires an initial value (a signal always has a value to render), and folds emissions into a plain signal — so an OnPush template reads it like any other signal and you never write a manual subscribe. This is now the PREFERRED bridge between RxJS and templates. The OTHER way is the async pipe (| async): it also subscribes / unsubscribes / marks-for-check, and it is still valid — but a signal is a plain value in the template (no pipe), composes with computed / effect, and works anywhere (not just templates). The same query state, written both ways, is shown below. Reach for toSignal; reach for the async pipe when you are handed a raw Observable you do not own and do not want to wrap." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.toSignal"
+        caption="The todo demo's query pipeline: switchMap + retry + catchError + startWith, bridged by toSignal."
+        [defaultOpen]="true"
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.asyncPipe"
+        caption="The async-pipe alternative — the pre-signals idiom, still valid."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Error handling -->
+  <ui-section-wrapper title="Error handling — retry / catchError / finalize">
+    <ui-content-group-wrapper title="Three operators cover the lifecycle">
+      <ui-text-block text="Server calls fail. RxJS models that as part of the stream, not an afterthought. retry re-subscribes on error with a per-attempt delay — use it for TRANSIENT failures (5xx, network); re-throw non-retryable errors (4xx) immediately so they surface at once. catchError catches a terminal error and CONTINUES the stream with a fallback value (or re-throws) — without it, an errored stream is dead and later refreshes could not recover it, so it is essential when a switchMap upstream may keep emitting. finalize runs a callback exactly once when the stream terminates (success, error, OR unsubscribe) — the right place for 'stop the spinner no matter what' and cleanup. The todo demo above composes all three: retry the 503s twice with backoff, catchError into the error QueryState, finalize for a console breadcrumb. For CRITICAL failures that should block the whole view, the app's severity-driven pattern renders the shared <ui-show-error> primitive (shown below); the todo demo uses an inline banner because its error is local and retryable." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.errors"
+        caption="retry (transient), catchError (recover), finalize (cleanup) — the error-handling trio."
+        [defaultOpen]="true"
+      />
+      <ui-example label="The <ui-show-error> primitive — for CRITICAL, view-blocking failures (with retry)">
+        <div class="err-frame">
+          <ui-show-error
+            message="The server is unreachable. Check your connection and try again."
+            kind="server"
+            severity="critical"
+            (retry)="demoRetry()"
+          />
+        </div>
+        <p class="retry-out">
+          retry output: <strong>{{ retryOut() }}</strong>
+        </p>
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Caching -->
+  <ui-section-wrapper title="Caching — shareReplay + time-based invalidation">
+    <ui-content-group-wrapper title="The atom of every RxJS HTTP cache">
+      <ui-text-block text="shareReplay turns a cold Observable into a hot, replaying one: ONE network request is shared across concurrent subscribers, and the last emission is replayed to late subscribers. That dedup is the building block of every RxJS-based HTTP cache. For freshness, combine it with time-based invalidation — wrap the source so that after a TTL elapses, the next subscriber triggers a fresh fetch (stale-while-revalidate without a cache library). Caching can live at two levels: a PER-QUERY service (one shareReplay per endpoint, with whatever invalidation you want — mutate then refetch, manual clear, key-based) which is what most apps end up with; or a CROSS-CUTTING interceptor that caches every GET by URL globally (simpler, but app-wide and TTL-only). The demo below shows the dedup live: the same Observable subscribed three times runs the producer ONCE with shareReplay, THREE times without it." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.caching"
+        caption="shareReplay (dedup) + a time-based (TTL) wrapper."
+        [defaultOpen]="true"
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.cacheInterceptor"
+        caption="The cross-cutting caching-interceptor alternative (shown for completeness)."
+      />
+      <ui-example label="shareReplay dedup — 3 subscribers, watch the producer-run count">
+        <app-rxjs-caching-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. Architecture: the seam -->
+  <ui-section-wrapper title="Architecture — where HttpClient belongs in this app">
+    <ui-content-group-wrapper title="Views go through the DI seam, not HttpClient">
+      <ui-text-block text="This screen imports HttpClient in the view ON PURPOSE because the screen IS teaching HttpClient. In the real app, a view NEVER imports HttpClient — that would couple presentation to transport and bypass the error pipeline. Views resolve data through the DI seam: the view injects a USE CASE (GET_POSTS_USE_CASE) or a REPOSITORY (POST_REPOSITORY) token from core/di/tokens.ts; the data layer (PostApiService in data/remote/) is the only place HttpClient is used, and it funnels every HttpErrorResponse through the retry interceptor, then httpErrorToException, then mapExceptionToFailure, and finally into a Result<T> (Success | Failed) that the view consumes. That layering keeps transport concerns (DTOs, status codes, retries) inside data/ and lets the UI reason only about domain Failures. The snippet shows the real PostApiService — the canonical example this demo deliberately simplifies away." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.seam"
+        caption="The real app's transport seam: PostApiService + the use-case token a view injects."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

@@ -1,0 +1,62 @@
+.log {
+  margin-top: var(--space-sm);
+  border: 1px solid var(--color-outline);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-tint);
+  padding: var(--space-sm);
+}
+.log summary {
+  cursor: pointer;
+  font-size: var(--text-body-sm);
+  color: var(--color-on-surface);
+}
+.log .muted {
+  color: var(--color-on-surface-variant);
+  font-size: var(--text-caption);
+}
+.logempty {
+  margin: var(--space-xs) 0;
+}
+.btn.ghost.small {
+  border: 1px solid var(--color-outline);
+  background: transparent;
+  color: var(--color-on-surface);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-sm);
+  font-size: var(--text-caption);
+  cursor: pointer;
+}
+.btn.ghost.small:hover {
+  background: var(--color-surface-variant);
+}
+.logtable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--space-xs);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+}
+.logtable th,
+.logtable td {
+  text-align: left;
+  padding: 2px var(--space-xs);
+  border-bottom: 1px solid var(--color-outline);
+}
+.logtable th {
+  color: var(--color-on-surface-variant);
+  font-weight: 600;
+}
+.logtable td.url {
+  color: var(--color-on-surface-variant);
+  word-break: break-all;
+}
+.logtable tr.err td.code {
+  color: var(--color-error);
+  font-weight: 600;
+}
+.logtable td.code {
+  color: var(--color-primary);
+}
+.logtable td.ord {
+  color: var(--color-on-surface-variant);
+}

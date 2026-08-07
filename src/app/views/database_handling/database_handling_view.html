@@ -1,0 +1,210 @@
+<div class="page">
+  <!-- 0. What the local layer is for -->
+  <ui-section-wrapper title="Database handling — local persistence the Angular way">
+    <ui-content-group-wrapper
+      title="A write-through cache, not a second source of truth"
+    >
+      <ui-text-block text="The server owns the truth; the local database owns a copy so the app still works when the network doesn't. In this app it is strictly a write-through cache of posts: the repository fetches from the remote, hands the result to the UI, and writes the same DTOs to the local store on the way through. On a later fetch that fails remotely, the repository reads the cache and serves that instead (with a non-blocking 'showing stale data' warning). If the cache is empty too, only then does the user see a blocking error. The whole job: persist across reloads and survive offline moments — and never let the rest of the app talk to the database directly." />
+      <ui-code-block
+        language="text"
+        [code]="snippets.whyLocal"
+        [defaultOpen]="false"
+        caption="Why IndexedDB (via Dexie) instead of localStorage."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 1. Dexie on top of IndexedDB -->
+  <ui-section-wrapper
+    title="Dexie — the ergonomic wrapper over IndexedDB"
+  >
+    <ui-content-group-wrapper
+      title="Promises, schema, typed tables — without the callback boilerplate"
+    >
+      <ui-text-block text="IndexedDB is the browser's built-in asynchronous database: it holds structured objects across reloads, scales to hundreds of megabytes (often gigabytes), runs off the main thread, and is shared across tabs of the same origin. Its raw API is also callback-based, transaction-heavy, and awkward to use directly. Dexie is the standard wrapper: a promise-based API, a declarative schema with versions and migrations, typed tables, and ergonomic queries (bulkPut, toArray, where). Dexie stores plain JSON-shaped objects directly, so PostDTO is both the in-memory and the on-disk shape — no extra (de)serialization layer. This app uses Dexie as the ONLY bridge to IndexedDB; everything above it is engine-agnostic." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. AppDatabase — the contract -->
+  <ui-section-wrapper
+    title="AppDatabase — the contract, not the engine"
+  >
+    <ui-content-group-wrapper
+      title="The repository depends on an abstract class"
+    >
+      <ui-text-block text="Just like PostRepository hides the network behind an interface, AppDatabase hides the storage engine. It is an abstract class declaring only what the repository needs — insert, read, and clear posts. The repository holds an AppDatabase, never a Dexie instance, never an IndexedDB request. So the engine is swappable (the dev build swaps in FakeAppDatabase; tests get the in-memory fallback) and the repository has zero knowledge of how rows are stored. AppDatabase is a data-layer contract — a view imports the POST_REPOSITORY token, never AppDatabase." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.contract"
+        [defaultOpen]="true"
+        caption="src/data/local/app-database.ts — the abstract contract the repository depends on."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. AppDatabaseImpl — the Dexie connection -->
+  <ui-section-wrapper
+    title="AppDatabaseImpl — the Dexie connection that owns the schema"
+  >
+    <ui-content-group-wrapper
+      title="One place that knows about IndexedDB"
+    >
+      <ui-text-block text="AppDatabaseImpl is the only file in the app that imports Dexie. It opens a named database, declares the schema (version + which tables exist and what their indexes / primary keys are), grabs a typed table handle, and hands it to a DAO. Per-table queries live in the DAO, not here — mirroring how the remote layer splits the HttpClient (connection) from the data source (queries). Splitting connection from queries keeps each file small and single-purpose." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.connection"
+        [defaultOpen]="true"
+        caption="src/data/local/app-database.ts — Dexie subclass. Schema setup, the DAO hand-off, and the in-memory fallback when IndexedDB is absent."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. PostDAO — one table -->
+  <ui-section-wrapper
+    title="PostDAO — one table, direct data-access operations"
+  >
+    <ui-content-group-wrapper
+      title="Owns a single Dexie table; upgrades engine errors"
+    >
+      <ui-text-block text="A DAO (Data Access Object) owns all queries for one table. It holds a single Dexie table and exposes insert / read / clear. Two things to notice: it works with DTOs (the on-disk shape), never domain models — that mapping is the repository's job one layer up; and it catches any engine error and re-throws it as a typed AppDatabaseException with the original as cause, so a flaky IndexedDB never leaks a raw Dexie error upward. The DAO is the leaf of the data layer — nothing in domain/ or ui/ ever imports it." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.dao"
+        [defaultOpen]="true"
+        caption="src/data/local/post-dao.ts — bulkPut / toArray wrapped in try/catch → AppDatabaseException."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. The seam — DAOs never leak to the view -->
+  <ui-section-wrapper
+    title="The seam — DAOs never leak to the view"
+  >
+    <ui-content-group-wrapper
+      title="The view depends on a contract, not on Dexie"
+    >
+      <ui-text-block text="This is the whole point of the screen. A component in this app never imports AppDatabaseImpl, PostDAO, or Dexie. It resolves the POST_REPOSITORY (or GET_POSTS_USE_CASE) DI token — the seam — and the Angular DI graph wires the concrete database behind it. data/providers.ts is the only place that knows which database implementation is bound (real Dexie in prod, in-memory fake in dev). That independence is what makes the layer swappable, testable without a browser, and reusable — and it is enforced by the dependency rule (ARCHITECTURE.md): dependencies point inward/downward, ui/ depends on data/ only through the DI tokens in core/di/tokens.ts." />
+      <ui-code-block
+        language="text"
+        [code]="snippets.seam"
+        [defaultOpen]="true"
+        caption="ui → inject(POST_REPOSITORY) → core/di token → domain contract → data impl → AppDatabase → PostDAO → Dexie."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Repository — offline-first -->
+  <ui-section-wrapper
+    title="How the repository uses it — write-through + offline-first fallback"
+  >
+    <ui-content-group-wrapper
+      title="Remote is primary, the cache is the safety net"
+    >
+      <ui-text-block text="The repository is where remote and local meet. On a successful fetch it writes the DTOs to the cache through the DAO (best-effort — a cache write failure is only logged, never shown to the user). On a network or server failure it reads the cache instead via the SAME AppDatabase contract: a hit yields Success with a non-blocking warning (stale-but-usable); a miss surfaces the original blocking failure; a cache read that itself throws chains a Critical CacheFailure on top of the upstream failure, preserving the whole cause chain for logs. The DTO → domain mapping (dtoToPost) happens HERE, once, so only domain Post objects travel up to the use case and UI." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.repository"
+        [defaultOpen]="true"
+        caption="src/data/repositories/post-repository-impl.ts — write-through + serveFromCache fallback."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Errors → typed Failures -->
+  <ui-section-wrapper
+    title="Database errors become typed Failures"
+  >
+    <ui-content-group-wrapper
+      title="The same pipeline as remote errors"
+    >
+      <ui-text-block text="A database failure follows the exact same path as a network failure: the DAO throws an AppDatabaseException (cause-chained on the raw Dexie/IndexedDB error), the guards map it to a Failure (DatabaseFailure — severity Critical), and the Failure's severity decides how the UI presents it. A read failure during cache fallback chains a CacheFailure on top of the network failure that caused the fallback — Failure.chain reconstructs the whole story ('No cached data available + caused by: Simulated offline') for logs. The UI never sees a DexieError or a raw IndexedDB event — only a Failure it can switch on. See the Exception-handling screen for the full error-pipeline treatment." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.errors"
+        [defaultOpen]="true"
+        caption="AppDatabaseException → DatabaseFailure / chained CacheFailure → Result."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. In-memory fallback -->
+  <ui-section-wrapper
+    title="In-memory fallback when IndexedDB is absent"
+  >
+    <ui-content-group-wrapper
+      title="Tests, SSR, and the fake wiring all survive without an engine"
+    >
+      <ui-text-block text="IndexedDB is a browser API — it does not exist in jsdom (the Vitest runner) or in server-side rendering contexts. AppDatabaseImpl detects that at construction (typeof indexedDB !== 'undefined') and degrades to an in-memory PostDTO[] store instead of throwing, so DI never blows up when the engine is missing. Every method branches the same way — the repository and the DAO do not know which path ran. The dev wiring goes one step further: environment.development.ts sets wiring.db:'fake', so provideData registers FakeAppDatabase (an in-memory @Injectable that reads ScenarioService) for the whole app. The tokens, the repository impl, and the error pipeline are all REAL production code — only the leaf database implementation is swapped. That is why the live demo below can drive the genuine pipeline entirely offline." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.fallback"
+        [defaultOpen]="true"
+        caption="src/data/local/app-database.ts — detect IndexedDB at construction, branch every method."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 9. CENTERPIECE: live demo -->
+  <ui-section-wrapper
+    title="Live — read/write through the real DAO via the repository seam"
+  >
+    <ui-content-group-wrapper
+      title="inject(POST_REPOSITORY) → repository → DAO → Dexie → Result"
+    >
+      <ui-text-block text="This is not a mock of the DAO — it IS the DAO. The demo binds POST_REPOSITORY at the component scope to the REAL PostRepositoryImpl backed by the REAL AppDatabaseImpl (Dexie + the real PostDAO → real IndexedDB in the browser; in-memory fallback in tests/SSR), with a tiny demo remote whose online/offline state the toggle controls. Walk the offline-first matrix: press 'fetch posts' (online) to write through to the cache via the DAO; flip 'offline' and fetch again to watch the cache survive in the DAO and be served with a non-blocking warning; 'clear cache' while offline to hit the blocking cache-miss path. The storage-engine readout shows which branch the real AppDatabaseImpl took in THIS environment. The view never imports a DAO — only the POST_REPOSITORY token." />
+    </ui-content-group-wrapper>
+    <ui-example
+      label="Real inject(POST_REPOSITORY) → write-through + offline-first cache"
+    >
+      <app-database-cache-demo />
+    </ui-example>
+  </ui-section-wrapper>
+
+  <!-- 10. How the view consumes it -->
+  <ui-section-wrapper
+    title="How the view consumes it — a Result state machine, no transport"
+  >
+    <ui-content-group-wrapper
+      title="The view holds no DAO, only a Result-driven state machine"
+    >
+      <ui-text-block text="The pipeline produces a Result; the UI still needs loading / success / error states to render. The idiomatic Angular home for that here is a small discriminated-union signal (DemoStatus) driven straight off Result — call repository.getPosts(), set the state based on result.ok, and the OnPush template reacts because signal writes ARE the change-detection trigger (no zone, no markForCheck). The component itself stays declarative: the template @switches on status and renders a spinner, the post list (plus an optional non-blocking warning banner when Result.Success carries one), or <ui-show-error/> for the blocking failure. The component's ONLY data dependency is inject(POST_REPOSITORY) — no Dexie, no DAO, no AppDatabaseImpl." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.consume"
+        [defaultOpen]="true"
+        caption="This screen's CacheDemo — component-scoped provideDemoCache() + inject(POST_REPOSITORY) + a status signal."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 11. The wiring -->
+  <ui-section-wrapper
+    title="The wiring — provideData swaps the engine per environment"
+  >
+    <ui-content-group-wrapper
+      title="One provider function picks real Dexie vs the in-memory fake"
+    >
+      <ui-text-block text="provideData(config) in src/data/providers.ts is the Angular equivalent of a service locator. It reads AppConfig.wiring (fake | live, swapped per environment via angular.json fileReplacements), picks the database implementation, and binds the PostRepository and GetPostsUseCase contracts through factories. So flipping dev → prod changes the wiring object in one environment file and the entire graph re-wires — the live AppDatabaseImpl (real Dexie) replaces the FakeAppDatabase, and no view changes. The live demo on this screen does the same trick at the component scope (provideDemoCache) so it can exercise the REAL Dexie DAO without disturbing the app-wide fake wiring." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.providers"
+        [defaultOpen]="true"
+        caption="src/data/providers.ts — pick DbImpl from config.wiring, bind POST_REPOSITORY."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 12. Angular vs React sibling -->
+  <ui-section-wrapper
+    title="Angular vs the React sibling — same local-persistence shape"
+  >
+    <ui-content-group-wrapper title="Where the standard Angular way lines up">
+      <ui-code-block
+        language="text"
+        [code]="snippets.angularVsReact"
+        [defaultOpen]="false"
+        caption="Engine, DI, fakes, and the offline-first fallback — a 1:1 mapping."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

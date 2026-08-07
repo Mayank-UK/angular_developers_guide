@@ -1,0 +1,111 @@
+<div class="page">
+  <!-- 1. Mental model -->
+  <ui-section-wrapper title="The Angular lifecycle — the mental model">
+    <ui-content-group-wrapper title="Create → check rounds → destroy">
+      <ui-text-block text="A directive or component moves through three stages: it is CREATED once, checked zero or more times during CHANGE-DETECTION ROUNDS, and DESTROYED once. Each change-detection round has two phases — CONTENT (the <ng-content> projected by a parent) checked before VIEW (the component's own template) — and Angular calls a pair of Init / Checked hooks around each phase. The classic eight hooks (ngOnChanges, ngOnInit, ngDoCheck, ngAfterContentInit, ngAfterContentChecked, ngAfterViewInit, ngAfterViewChecked, ngOnDestroy) all hang off those moments. Implement only the ones you need; most components use one or two." />
+      <ui-text-block text="The crucial ordering detail for a parent + child tree: the parent runs ngOnChanges, ngOnInit, ngDoCheck, ngAfterContentInit and ngAfterContentChecked, then the ENTIRE child sequence fires, then the parent's ngAfterViewInit and ngAfterViewChecked. The parent's view hooks necessarily come last — a view is not 'complete' until every child inside it is. That is why reading @ViewChild on the parent in ngAfterViewInit is safe: the child has already been built." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.order"
+        caption="The firing order for one component, and the parent+child interleaving."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. Centerpiece — live lifecycle-order demo -->
+  <ui-section-wrapper title="Live — watch every hook fire, in order">
+    <ui-content-group-wrapper title="A parent + child that log every hook to the screen">
+      <ui-text-block text="Mount the parent (and the child inside it), then bump the @Input() value or change the projected content, then unmount. Every hook fire appends to the ordered log below. The order counter is the authoritative firing sequence across the whole tree — the millisecond column only disambiguates fast successive fires. The demo components deliberately implement every classic hook interface and use classic @Input() (the decorator) rather than signal inputs, because a signal input would NOT trigger ngOnChanges and the first hook would silently disappear from the log." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.classicChild"
+        caption="The child demo component — a class implementing all eight hooks (for teaching; real components use one or two)."
+      />
+      <ui-example label="Mount, change an @Input(), change projected content, unmount — and watch the order">
+        <app-lifecycle-order-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. Per-hook reference cheat sheet -->
+  <ui-section-wrapper title="Every hook — when it fires, when to use it, pitfalls">
+    <ui-content-group-wrapper title="The classic eight, in firing order">
+      <ui-text-block text="Each row gives the hook, when it fires in the round, what it is genuinely good for, and the pitfalls that bite. The short version: reach for ngOnInit for one-time setup, ngAfterViewInit when you need @ViewChild / DOM measurement, and ngOnDestroy (or better, DestroyRef) for teardown. Avoid the *Checked hooks for anything but measurement — they fire constantly and are the #1 source of 'ExpressionChangedAfterItHasBeenChecked' errors." />
+      <div class="cheat">
+        <div class="cheat-head">
+          <span>hook</span>
+          <span>fires</span>
+          <span>use for</span>
+          <span>pitfalls</span>
+        </div>
+        @for (row of hookReference; track row.hook) {
+          <div class="cheat-row">
+            <span class="hook">{{ row.hook }}</span>
+            <span class="fires">{{ row.fires }}</span>
+            <span class="use">{{ row.useFor }}</span>
+            <span class="pit">{{ row.pitfalls }}</span>
+          </div>
+        }
+      </div>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. Signal inputs vs @Input() -->
+  <ui-section-wrapper title="Signal inputs vs @Input() — the ngOnChanges trap">
+    <ui-content-group-wrapper title="Signal inputs do NOT fire ngOnChanges">
+      <ui-text-block text="This is the most important modern distinction. A classic @Input() (the decorator) triggers ngOnChanges whenever its reference changes, with a SimpleChanges map of first / previous / current values. A signal input (input()/input.required()) does NOT trigger ngOnChanges at all — it never fires, even as the value changes. Signal inputs are reactive values you read as functions in the template and in computed/effect; the way to 'react' to a signal input change is a computed (derive) or an effect (side-effect), not a lifecycle hook. Prefer signal inputs for new code; reach for @Input() only when you specifically need the SimpleChanges diffing semantics or are integrating with older APIs." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.signalInput"
+        caption="Signal input (no ngOnChanges) vs classic @Input() (fires ngOnChanges)."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. Modern teardown — DestroyRef + takeUntilDestroyed -->
+  <ui-section-wrapper title="Teardown — DestroyRef is the modern ngOnDestroy">
+    <ui-content-group-wrapper title="Prefer DestroyRef.onDestroy / takeUntilDestroyed">
+      <ui-text-block text="ngOnDestroy still works and implementing OnDestroy is fine, but the modern preference is DestroyRef. Inject DestroyRef anywhere (a service, a directive, even outside a component in any injection context) and register an onDestroy callback — it runs at the same moment as ngOnDestroy but is testable, composable, and does not require the interface. For RxJS subscriptions, pipe through takeUntilDestroyed() (from @angular/core/rxjs-interop) and the subscription auto-unsubscribes when the injector destroys. The classic hook is shown last; prefer the first two for new code." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.modernDestroy"
+        caption="DestroyRef.onDestroy and takeUntilDestroyed — the modern alternatives to OnDestroy."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Signals lifecycle — live demo -->
+  <ui-section-wrapper title="The Signals lifecycle — effect, computed, afterRender">
+    <ui-content-group-wrapper title="A leaner lifecycle that composes with (and often replaces) the hooks">
+      <ui-text-block text="Signals have their own lifecycle that rarely needs the classic hooks. signal holds reactive state; computed derives lazy, memoised values that recompute only when a dependency changes and only when read; effect runs a side-effect whenever the signals it reads change (its first run is scheduled at the end of the current change-detection turn); afterRender and afterNextRender run after the DOM is painted (every render, or once); afterRenderEffect is the injection-context-safe way to scope render callbacks to this component's lifecycle with automatic cleanup. The typical modern component is a constructor that wires a few effects and computed signals — no ngOnInit, no ngAfterViewInit, no ngOnDestroy needed. Bump the count below and watch the effect fire during change detection, then the render callbacks after paint." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.effectSnippet"
+        caption="signal + computed + effect — the reactive core that replaces most hooks."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.afterRenderSnippet"
+        caption="afterNextRender / afterRender / afterRenderEffect — post-paint callbacks."
+      />
+      <ui-example label="Bump the count — watch the effect fire, then the render callbacks">
+        <app-signals-lifecycle-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Pitfall — ExpressionChangedAfterChecked -->
+  <ui-section-wrapper title="Pitfall — ExpressionChangedAfterItHasBeenChecked">
+    <ui-content-group-wrapper title="Never write template-read state inside a check-time hook">
+      <ui-text-block text="This is the error every Angular developer meets. In development mode Angular runs change detection twice and asserts nothing changed between the two passes. If you write to a field the template ALREADY read, during ngAfterContentChecked / ngAfterViewChecked / ngDoCheck (or synchronously inside an effect that the template depends on), the second pass sees a different value and throws ExpressionChangedAfterItHasBeenChecked. The fix is structural: mutate state in response to EVENTS (user actions) or in ngOnInit, and if you truly must change it in a check-time hook, call markForCheck so Angular knows to re-run. The *Checked hooks should be read-only." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.pitfallExpressionChanged"
+        caption="The textbook ExpressionChangedAfterChecked bug, and why it throws."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

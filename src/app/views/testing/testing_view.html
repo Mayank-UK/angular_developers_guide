@@ -1,0 +1,298 @@
+<div class="page">
+  <!-- 0. What & why -->
+  <ui-section-wrapper title="Testing — guard the seams the architecture built">
+    <ui-content-group-wrapper
+      title="Tests catch what types and the compiler cannot"
+    >
+      <ui-text-block
+        text="TypeScript checks that code is well-formed; it cannot check that the code does the right thing. A repository that returns posts in the wrong order, a screen that white-screens because a provider was mis-wired, a directive that never paints — all type-check fine. Tests are the only thing that exercises behaviour end to end. The goal of this app's tests is narrow and deliberate: guard the seams the architecture created (does the exception→failure map work? does the real DI graph resolve? does each screen mount without throwing?) so the layers can be refactored freely underneath."
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper title="This suite, right now">
+      <ui-text-block
+        text="The current suite is small, fast, and high-signal. Every spec runs in jsdom (no browser launch) and the whole suite finishes in under two seconds. The two panels below are the inventory: which layers are covered, and which spec files cover them. Each new spec is paired with the screen it documents."
+      />
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-value">{{ totalTests }}</span>
+          <span class="stat-label">tests passing</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">{{ specFiles }}</span>
+          <span class="stat-label">spec files</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">&lt; 2s</span>
+          <span class="stat-label">full-suite runtime</span>
+        </div>
+      </div>
+      <div class="coverage">
+        <div class="cov-item">
+          <span class="cov-layer">core</span>
+          <span class="cov-detail">
+            Result (result.spec), Failure chain/severity (failure.spec),
+            AppException cause-chain (exceptions.spec), error-pipeline guards
+            (guards.spec), stringify (stringify.spec), AppConfig + predicates
+            (config/*.spec) — all pure-unit, no TestBed.
+          </span>
+        </div>
+        <div class="cov-item">
+          <span class="cov-layer">data</span>
+          <span class="cov-detail">
+            provideData fake-vs-live wiring + ScenarioService toggles
+            (providers.spec) — TestBed resolves the real tokens and asserts
+            which concrete class the injector built.
+          </span>
+        </div>
+        <div class="cov-item">
+          <span class="cov-layer">app</span>
+          <span class="cov-detail">
+            App shell mounts through the real DI/router tree (app.spec),
+            TruncatePipe pure transformation (truncate.pipe.spec),
+            HighlightDirective host behaviour (highlight.directive.spec),
+            createMediaQuerySignal listener + cleanup (media-query.spec).
+          </span>
+        </div>
+      </div>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 1. The stack -->
+  <ui-section-wrapper title="The stack — Vitest + jsdom + TestBed">
+    <ui-content-group-wrapper
+      title="Three pieces, each with one job"
+    >
+      <ui-text-block
+        text="The Angular CLI ships its own test runner via the @angular/build:unit-test builder. Under the hood it is Vitest + jsdom — the same transform the dev/build uses, so a test sees exactly what the browser sees. On top of that, Angular's TestBed is the harness that mounts a component through a real DI tree (you provide the real tokens, or override one with a fake). The three pieces: Vitest runs the spec files (describe/it/expect are global, no import needed); jsdom is a pure-JS DOM so a test is a normal Node process with no browser launch; TestBed is the Angular-aware mount + query layer that resolves inject(TOKEN) the same way the live app does."
+      />
+      <ui-code-block
+        language="json"
+        [code]="snippets.angularJson"
+        [defaultOpen]="true"
+        caption="angular.json — the unit-test builder + the one setup file."
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="The global setup file — polyfill what jsdom omits"
+    >
+      <ui-text-block
+        text="jsdom does not implement window.matchMedia, which ThemeService touches during initial-mode resolution. Without the polyfill, constructing any component that injects ThemeService would throw under test. setup.ts runs once before any spec and patches it with a static non-matching MediaQueryList — the same fix the React sibling uses. This is the canonical reason setupFiles exists: patch the environment once, so specs never repeat the workaround."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.setupTs"
+        [defaultOpen]="true"
+        caption="src/test/setup.ts — the matchMedia polyfill."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. Spec anatomy -->
+  <ui-section-wrapper title="Spec file anatomy — describe / it / beforeEach / expect">
+    <ui-content-group-wrapper title="Three primitives, one rhythm">
+      <ui-text-block
+        text="Every spec is built from the same three primitives. describe groups related tests around one thing under test; it declares one test with one logical assertion target; beforeEach runs before each it and arranges the world so tests stay independent. The rhythm inside each it is always arrange → act → assert: build the inputs, call the thing, assert on the observable result. Vitest exposes describe/it/expect as globals, so a spec file only imports the code it exercises — no test-framework boilerplate."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.specAnatomy"
+        [defaultOpen]="true"
+        caption="The three primitives + the arrange → act → assert rhythm."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. Two kinds of test -->
+  <ui-section-wrapper title="Two kinds of test live in this codebase">
+    <ui-content-group-wrapper
+      title="Pure-unit (no TestBed) — the core logic"
+    >
+      <ui-text-block
+        text="The first kind tests plain TypeScript with no DOM and no Angular runtime. core/result.spec.ts constructs values by hand and asserts on them. These are fast (microseconds), need no setup, and pin down the one piece of logic every screen depends on — the Result discriminated union that carries success-or-failure through the domain boundary. Reach for this style whenever the code under test is pure: given inputs, deterministic output, no framework."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.pureUnit"
+        [defaultOpen]="true"
+        caption="src/core/result.spec.ts — pure logic, no TestBed, no DOM."
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="Integration (real DI tree) — the smoke + interaction tests"
+    >
+      <ui-text-block
+        text="The second kind mounts a component through the real provider tree. app.spec.ts imports the App shell, lists it in TestBed.configureTestingModule, stubs only the Router (with provideRouter([])), and asserts the header rendered — a guard against white-screen runtime errors (broken providers, mis-wired outlets, construction-time throws) that tsc can never catch. TestBed is the difference: it resolves inject(TOKEN) the same way the live app does, so the spec exercises the real wiring, not a mock shell."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.testbedComponent"
+        [defaultOpen]="true"
+        caption="src/app/app.spec.ts — TestBed mounts the real App through the real DI."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. HttpClient testing -->
+  <ui-section-wrapper
+    title="HttpClient testing — provideHttpClientTesting + HttpTestingController"
+  >
+    <ui-content-group-wrapper
+      title="Assert on the request, then flush the response"
+    >
+      <ui-text-block
+        text="When the code under test calls HttpClient, you do not want the spec to hit a real server. provideHttpClientTesting swaps in a fake backend that records every request and lets the spec assert on it. The pattern is always two steps: call the method (which fires the request), then httpMock.expectOne(url) asserts exactly one request was made to that URL, inspect its method/body, and req.flush(payload) delivers the fake response. afterEach always calls httpMock.verify() so an unhandled request fails the spec — a request you forgot to flush is almost always a bug."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.httpTesting"
+        [defaultOpen]="true"
+        caption="Stub the backend, assert on the request, flush the response."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. Testing signals -->
+  <ui-section-wrapper title="Testing signals — drive them like the template does">
+    <ui-content-group-wrapper
+      title="Write the signal, read the value (or computed)"
+    >
+      <ui-text-block
+        text="Signals are functions, so testing them is just calling them. Write the source with .set()/.update(), then read the value or a computed and assert. Computed re-derives lazily on read, so the assertion is the read — no flush, no detectChanges needed for the pure-logic case. For effects, which schedule side-effects during change detection, prefer to have the effect write to a signal you control and assert on that signal; or wrap the work in an injection context. Inside a component test, the same move works: write the component's input signal, call fixture.detectChanges(), then assert on the rendered output — exactly how a user drives the UI."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.signalsTest"
+        [defaultOpen]="true"
+        caption="Pure signal assertions + a component-signal assertion."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. The DI seam under test -->
+  <ui-section-wrapper
+    title="Testing the DI seam — overrideProvider with a fake"
+  >
+    <ui-content-group-wrapper
+      title="Swap one token; the consumer never notices"
+    >
+      <ui-text-block
+        text="The DI seam exists so a test can swap one implementation without touching the consumer. TestBed.overrideProvider(TOKEN, { useValue: fake }) (or listing a provider under the test's providers) replaces the binding for this spec only — the component still resolves it via inject(TOKEN) and never knows whether it got the live class or a hand-written fake. This is how the dependency-management screen's introspection works in test, and how you'd test a feature page against a use case that returns a fixed Result without going near HttpClient or IndexedDB. The rule: prefer a fake that implements the real interface over a mock framework — fakes are plain classes, type-checked against the same contract, and survive refactors of the call site."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.overrideProvider"
+        [defaultOpen]="true"
+        caption="Override GET_POSTS_USE_CASE with a fake for this spec only."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Pipes + directives -->
+  <ui-section-wrapper
+    title="Testing pipes + directives"
+  >
+    <ui-content-group-wrapper
+      title="Pipes are the cheapest test in Angular"
+    >
+      <ui-text-block
+        text="A pure pipe is a pure function — instantiate it and call transform. No TestBed, no fixture, no async. The whole spec is new TruncatePipe(), call transform with each input, assert on the string that comes back. Directives need TestBed because they mutate a host element through the Angular event + change-detection pipeline: declare a tiny host component that applies the directive to a real DOM node, render it, then dispatch events and assert on the rendered host's style/attributes."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.pipeDirectiveTest"
+        [defaultOpen]="true"
+        caption="truncate.pipe.spec.ts (no TestBed) + highlight.directive.spec.ts (TestBed)."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. Error pipeline -->
+  <ui-section-wrapper
+    title="Testing the error pipeline — Result / Failure logic"
+  >
+    <ui-content-group-wrapper
+      title="The one piece of logic every screen's error treatment depends on"
+    >
+      <ui-text-block
+        text="The error pipeline is the spine of the app, so it earns the most thorough spec. guards.spec constructs exceptions, calls mapExceptionToFailure, and asserts on the resulting Failure's kind, severity, and chained cause — proving a NetworkException becomes a critical NetworkFailure, a TimeoutException (a subclass of NetworkException) still routes through the network branch, a 5xx HttpErrorResponse maps all the way through to a ServerFailure, and a compound cache-then-network failure preserves the whole story in Failure.chain. Pure-unit, fast, exhaustive on the cases that matter."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.errorPipelineTest"
+        [defaultOpen]="true"
+        caption="src/core/error-handling/guards.spec.ts — the pipeline, pure-unit."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 9. Fakes vs real wiring -->
+  <ui-section-wrapper
+    title="Fakes vs real wiring — the environment swap is itself under test"
+  >
+    <ui-content-group-wrapper
+      title="providers.spec proves one config field re-wires the whole graph"
+    >
+      <ui-text-block
+        text="provideData(config) reads AppConfig.wiring and binds fake-vs-live implementations against the tokens. The spec for it mounts provideData with each wiring slot and asserts which concrete class the injector built — proving the swap is a one-field change with zero view-side consequences. The fakes (FakeApiService, FakeAppDatabase) read ScenarioService to inject failures on demand, so the same integration test can drive the genuine Result.Failed path by flipping a scenario signal. No mock framework, no monkey-patching: the fakes implement the real interface and are type-checked against it."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.fakesVsReal"
+        [defaultOpen]="true"
+        caption="src/data/providers.spec.ts — fake-vs-live swap + scenario-driven failures."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 10. Live runner -->
+  <ui-section-wrapper
+    title="Live — a spec runner you can break"
+  >
+    <ui-content-group-wrapper
+      title="Run the suite, then introduce a bug and watch it go red"
+    >
+      <ui-text-block
+        text="This is a real, in-page miniature of the loop: a tiny counter component, three behavioural assertions against its value, and a switch that injects a bug. Run the suite green, flip the bug, run again — the failing assertion turns red and the runner reports exactly what it expected versus what it got. That red-then-green feedback is the entire point of the specs above. The runner is a simulated harness (the real runner only executes at npm test); what it demonstrates is the shape of an assertion failure — the expected-vs-actual line that tells you exactly what to fix."
+      />
+      <ui-example label="behavioural tests, run live">
+        <app-testing-runner-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 11. Running -->
+  <ui-section-wrapper title="Running the tests">
+    <ui-content-group-wrapper
+      title="One command, watch or single-run, filterable by path"
+    >
+      <ui-text-block
+        text="npm test runs the whole suite once (CI-shaped). The builder supports watch mode for development and --include globs to run one folder or one kind of spec. All of this runs inside Docker — there is no node_modules on the host — so the command is always docker compose run --rm app npm test, never bare npm on the host. The suite stays green as a commit gate; a failing spec blocks merge."
+      />
+      <ui-code-block
+        language="bash"
+        [code]="snippets.running"
+        [defaultOpen]="true"
+        caption="Inside the dev container — the only place npm/ng run."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 12. Angular vs React sibling -->
+  <ui-section-wrapper
+    title="Angular vs the React sibling — same goals, different harness"
+  >
+    <ui-content-group-wrapper
+      title="TestBed vs render(), Vitest is shared"
+    >
+      <ui-text-block
+        text="Both suites share the same runner (Vitest) and the same DOM (jsdom), and both split into pure-unit specs for the core plus integration specs that mount each screen through the real provider tree. The Angular difference is TestBed — the DI-aware harness that resolves inject(TOKEN) exactly as the live app does, so overriding a provider with a fake is a one-liner that flows through the real consumer. The React sibling uses render(<App/>) under the real RouterProvider/ThemeProvider instead. The philosophy is identical: test behaviour, query the DOM the way a user does, never reach into internals."
+      />
+      <ui-code-block
+        language="text"
+        [code]="snippets.angularVsReact"
+        [defaultOpen]="true"
+        caption="Side-by-side: this app's stack vs the React sibling's."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

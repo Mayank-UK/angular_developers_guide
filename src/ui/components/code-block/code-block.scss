@@ -1,0 +1,78 @@
+:host {
+  display: block;
+}
+
+.code-block {
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-outline);
+  background-color: var(--color-surface-variant);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-md);
+}
+
+.lang,
+.copy {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  color: var(--color-on-surface-variant);
+  transition: color 0.15s ease;
+}
+
+.lang {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.lang:hover {
+  color: var(--color-on-surface);
+}
+
+.caret {
+  display: inline-block;
+  width: 10px;
+  text-align: center;
+}
+
+.copy {
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs);
+}
+
+.copy:hover {
+  color: var(--color-on-surface);
+  background-color: color-mix(
+    in srgb,
+    var(--color-on-surface) 10%,
+    transparent
+  );
+}
+
+.source {
+  margin: 0;
+  overflow-x: auto;
+  border-top: 1px solid var(--color-outline);
+  padding: var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-body-sm);
+  line-height: 1.7;
+  color: var(--color-on-surface);
+}
+
+.caption {
+  border-top: 1px solid var(--color-outline);
+  background-color: var(--color-surface-variant);
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--text-caption);
+  color: var(--color-on-surface-variant);
+}

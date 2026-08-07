@@ -1,0 +1,99 @@
+<div class="page">
+  <!-- 0. When to use — the hub's framing -->
+  <ui-section-wrapper title="When to reach for SignalStore (lightweight shared state)">
+    <ui-content-group-wrapper title="The middle ground — structured, reusable, no boilerplate">
+      <ui-text-block text="This screen is the LIGHTWEIGHT shared-state answer to the state-management hub's question: which state are you managing? NgRx SignalStore sits between the built-in Signals screen (one component's state) and the full NgRx Store screen (a Redux tree with actions, reducers, selectors, and effects). It is a factory — signalStore(...) — that composes an injectable store out of small withX features (withState / withComputed / withMethods / withHooks) holding plain signals. So you read it with the same store.todos() call as any signal: OnPush updates for free, no selectSignal plumbing, no action types, no reducer file. That is why it is the sweet spot for most apps whose state needs to be shared beyond one component but does not justify a full Redux pipeline — a feature store, a session cart, a wizard held across routes. The same todo app you built with a signal and with a Redux store is rebuilt here on a SignalStore; compare the three to feel exactly where the trade-off lands." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.when"
+        caption="The hub's decision rule, in code: SignalStore is the middle option."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 1. Mental model — a factory composes a store out of features -->
+  <ui-section-wrapper title="Mental model — a store is composed of features">
+    <ui-content-group-wrapper title="withState + withComputed + withMethods + withHooks">
+      <ui-text-block text="A SignalStore is an injectable class built by calling signalStore with a list of FEATURES. Each feature adds one slice of capability: withState declares the reactive cells (each key becomes a signal); withComputed derives memoised signals from them (STORE the minimum, DERIVE the rest); withMethods adds the actions — plain methods that mutate via patchState; withHooks runs lifecycle (onInit / onDestroy) for setup, teardown, and RxJS side-effects. The file reads top-to-bottom as the whole state contract. There is no separate actions file, no reducer file, no selectors file: the four concerns live in one composed definition, which is most of the boilerplate savings over the full store. The result is still a class — you inject it, you call its signals, you call its methods — it is just signals all the way down." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.factory"
+        caption="signalStore(withState, withComputed, withMethods, withHooks) — one composed definition."
+        [defaultOpen]="true"
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.feature"
+        caption="signalStoreFeature packages a reusable slice (a loading flag, an entity cache) you mix into any store."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. Providing — root singleton vs component-local -->
+  <ui-section-wrapper title="Providing a store — root singleton vs component-local">
+    <ui-content-group-wrapper title="Where you list it decides its lifetime">
+      <ui-text-block text="A signalStore class is an @Injectable — so WHERE you list it in providers decides its lifetime, exactly like any Angular service. List it in app.config.ts providers and it is a ROOT SINGLETON: inject(Store) returns the same instance everywhere, and any two components read and write the same state. List it in a component's providers instead and the injector builds a FRESH instance per element, dying with it — the pattern for a widget, a form, or a dialog whose state should not leak. In @ngrx/signals 21 there is no separate provideState helper: listing the class in providers IS the registration (older docs called this provideState(TodosStore); the helper was folded into plain providers). Pick root when the state is shared app-wide; pick component-local when it belongs to one component's lifetime." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.provide"
+        caption="Root singleton (app.config providers) vs component-local (component providers)."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. The centerpiece — the live todo app on a ROOT-provided SignalStore -->
+  <ui-section-wrapper title="Live — the todo app powered by a root SignalStore">
+    <ui-content-group-wrapper title="inject the store, read signals, call methods">
+      <ui-text-block text="The centerpiece. A complete, working todo application reading from the REAL root-provided SignalStore wired in app.config.ts. The component holds NO todo state itself: it injects TodosStore and reads the store's signals and computed signals directly in the template — store.visible(), store.remaining(), store.filter() — so OnPush re-renders automatically with zero change-detection plumbing. Adding, toggling, clearing, and filtering are plain method calls on that same object (store.add(text), store.toggle(id), store.setFilter(filter)) — no dispatch, no action creator. Every count is a withComputed signal; the visible list is a withComputed signal off the todos + filter cells; the store's onInit hook hydrates from localStorage and persists after each change. This is a SignalStore doing the same job as the Redux store on the previous screen, with markedly less machinery." />
+      <ui-example label="Add, toggle, filter all/active/done, clear done — state is in the store, not the component">
+        <app-signal-store-todo-demo />
+      </ui-example>
+      <ui-code-block
+        language="ts"
+        [code]="snippets.component"
+        caption="inject(TodosStore) + read signals (template) + call methods (write). No dispatch, no selectSignal."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. RxJS integration — rxMethod + tap in withHooks -->
+  <ui-section-wrapper title="RxJS integration — rxMethod in withHooks">
+    <ui-content-group-wrapper title="Side-effects at the edges; signals in the middle">
+      <ui-text-block text="SignalStore is signals-first, but it does not abandon RxJS — it meets it in withHooks via rxMethod. rxMethod wraps an RxJS pipeline into something you can drive with a signal's observable (or any source stream), with the subscription tied to the store's lifetime automatically. The canonical pair lives in onInit: hydrate synchronously from localStorage before first paint, then pipe the todos signal — via toObservable(store.todos) — through debounceTime + tap so rapid edits collapse into one debounced write. The reducer-free world of the cells stays pure; the side-effect (persistence) lives at the edge, exactly as it does in a full NgRx Effects class, just expressed as one pipeline inside the hook. rxMethod also bridges the other way: hand it a WebSocket or an intent stream and let the pipeline dispatch store methods downstream." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.rxjs"
+        caption="withHooks + rxMethod + tap — hydrate on init, debounced persistence via toObservable(store.todos)."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. Component-local store demo -->
+  <ui-section-wrapper title="Live — a component-local store (two independent instances)">
+    <ui-content-group-wrapper title="providers: [Store] on a component builds a fresh store per element">
+      <ui-text-block text="The contrast to the root store above. The CounterStore used here is identical in shape (withState + withMethods) but it is listed in the component's own providers, so the injector creates a FRESH instance for each element — and this demo renders two. Bump Counter A and Counter B does not move: they are separate stores, with separate lifetimes, that will be garbage-collected when their components die. That is the component-local pattern: reach for it when the state belongs to one component's existence (a single widget's open/closed, a form's dirty flag, an editor buffer). Reach for the root pattern when the state must outlive any one component or be shared between distant ones — as the todo store above is." />
+      <ui-example label="Two counters, two stores — proving providers: [Store] is component-scoped">
+        <div class="counter-pair">
+          <app-signal-store-component-demo label="Counter A" />
+          <app-signal-store-component-demo label="Counter B" />
+        </div>
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. One-pager + when NOT to use -->
+  <ui-section-wrapper title="The pieces, and when NOT to use SignalStore">
+    <ui-content-group-wrapper title="signalStore + withX + patchState — and the lighter/heavier alternatives">
+      <ui-text-block text="The whole pattern in one breath: signalStore(...) is a FACTORY that returns an injectable class — a bag of signals + methods + hooks, no reducer, no action creators. withState declares the reactive cells; withComputed derives memoised signals (store the minimum, derive the rest); withMethods adds the actions as plain methods calling patchState (the immutable-update helper, new ref each time); withHooks runs onInit / onDestroy lifecycle, where RxJS side-effects live via rxMethod so the cells stay pure. Provide it root for a singleton, component-local for a per-element store. Read it by injecting the store and calling its signals in the template — OnPush re-renders automatically. When NOT to use it: for a single component's state that never leaves that component, a plain signal is lighter still (see the Signals screen); for many distant shared slices with a team that wants serialised, time-travelling history and middleware, the full NgRx Store earns its weight (see the NgRx screen); for server data, use HttpClient + RxJS. SignalStore is the middle path — most shared state in most apps." />
+      <ui-code-block
+        language="text"
+        [code]="snippets.onepager"
+        caption="signalStore + withState/Computed/Methods/Hooks + patchState — the whole pattern on one page."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

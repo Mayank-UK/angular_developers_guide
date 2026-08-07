@@ -1,0 +1,222 @@
+<div class="page">
+  <!-- 0. What & why -->
+  <ui-section-wrapper
+    title="Debugging — three toolboxes, one missing thing to find"
+  >
+    <ui-content-group-wrapper
+      title="Narrow the search before you read anything"
+    >
+      <ui-text-block
+        text="Debugging is the process of turning 'something is wrong' into 'this exact line, given this exact input'. The discipline is to narrow before you read: reproduce it reliably, then bisect — is it a render problem, a data problem, or a network problem? Angular gives you three toolboxes, each answering one of those. Angular DevTools (the browser extension) shows the component tree and profiles change detection — the thing the DOM cannot show you. The browser DevTools (Sources + source maps, Network, Console) show the runtime the app runs in. And the app's own structured output — RxJS tap logs, the Failure.chain cause trace, signal effects, and the level-gated Logger — narrates what each layer did. Reach for the one that matches the symptom, not all of them at once."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 1. Angular DevTools — component tree inspector (LIVE) -->
+  <ui-section-wrapper
+    title="Angular DevTools — the component tree and change detection"
+  >
+    <ui-content-group-wrapper
+      title="See what the tree actually is, and what each signal holds"
+    >
+      <ui-text-block
+        text="Angular DevTools is the official browser extension (Chrome/Firefox). It shows two things the DOM cannot: the COMPONENT tree (components have no DOM node of their own — only their rendered output does), and the live value of every signal/input/state field in the selected component. When a screen renders the wrong thing, the first question is 'what does the signal hold?' and the Components tab answers it. The Profiler tab answers the second question — 'why did this re-render?' — by recording a change-detection pass and listing every component that ran CD and the trigger (signal write, input change, event). It is the only way to chase down a slow screen."
+      />
+      <ui-code-block
+        language="text"
+        [code]="snippets.devToolsTree"
+        [defaultOpen]="true"
+        caption="What the Components and Profiler tabs show."
+      />
+      <ui-code-block
+        language="text"
+        [code]="snippets.devToolsProfiler"
+        [defaultOpen]="false"
+        caption="Profiler findings and the fixes they point at."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-example label="Live — devtools-style component-tree inspector">
+      <app-devtools-inspector-demo />
+    </ui-example>
+  </ui-section-wrapper>
+
+  <!-- 2. Browser DevTools — source maps + breakpoints -->
+  <ui-section-wrapper
+    title="Browser DevTools — source maps, breakpoints, Network"
+  >
+    <ui-content-group-wrapper
+      title="The four panels you reach for"
+    >
+      <ui-text-block
+        text="• Console — the catch-all. Uncaught errors, the Logger's output, and Angular's own dev-mode warnings (NG0XXX codes for hydration, signals, control-flow, DI mistakes) all land here. In dev Angular is deliberately noisy — read those warnings, they are almost always real bugs.
+
+• Sources — set a breakpoint and pause execution. The Angular CLI serves source maps in dev, so the file you see is your original TypeScript, not the bundled output — set the breakpoint on the real line, inspect variables in scope, step through. The debugger; statement works as a breakpoint you can commit to source.
+
+• Network — every request, its status, headers, and body. This is where you confirm 'the API really did return 500' or 'the payload was malformed' rather than guessing from the UI. Match it against the Logger to see the full path.
+
+• Application → IndexedDB — inspect the Dexie stores the local layer wrote (the Database-handling screen covers this). Useful when the offline-first cache fallback returns stale data and you need to see what's actually stored."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.sourceMaps"
+        [defaultOpen]="true"
+        caption="angular.json ships source maps in dev; debugger; pauses on the real TS line."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. ng.probe + Augury legacy -->
+  <ui-section-wrapper
+    title="ng.probe and Augury — the legacy debugging hooks"
+  >
+    <ui-content-group-wrapper
+      title="What replaced them, and what to use instead"
+    >
+      <ui-text-block
+        text="Two older debugging tools are effectively gone from modern Angular and are mentioned here only so the names don't confuse you. ng.probe(window.ng.probe) was the pre-Ivy console helper that returned a component instance from a DOM element — it does not exist under Ivy (Angular 9+); the modern equivalent is the Angular DevTools Components tab, or a viewChild / contentChild signal query from inside the component. Augury was the even-older Chrome extension for AngularJS / early Angular — it is deprecated, unmaintained, and does not understand signals or standalone components. Use Angular DevTools for everything. The legacy snippet below is for context only."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.ngProbe"
+        [defaultOpen]="false"
+        caption="Legacy ng.probe / Augury — replaced by DevTools and signal queries."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. RxJS debugging — tap / catchError / finalize (LIVE) -->
+  <ui-section-wrapper
+    title="RxJS debugging — tap, catchError, finalize"
+  >
+    <ui-content-group-wrapper
+      title="The debug side-channel that never changes the stream"
+    >
+      <ui-text-block
+        text="RxJS pipelines are the data layer's backbone (HttpClient, the retry interceptor, the SignalStore rxMethod bridge). The three operators you reach for while debugging are tap (see every value without changing it), catchError (recover, or re-throw a typed error), and finalize (fires exactly once on completion OR error — the cleanup hook). None of them mutate the stream — they are the reactive console.log. For visualising operator timing, marble diagrams (rxjs-devtools, rxmarbles.com) map the ASCII marble notation onto each operator so you can SEE the relationship between the source and the transformed stream. The app's own retry.interceptor.ts is the canonical example — every branch is a place to drop a tap()."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.retryInterceptor"
+        [defaultOpen]="true"
+        caption="src/data/remote/retry.interceptor.ts — the app's REAL interceptor (excerpt)."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.tapCatchFinally"
+        [defaultOpen]="false"
+        caption="The debug side-channel — tap / catchError / finalize + marbles."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-example label="Live — RxJS stream piped to an on-screen console">
+      <app-rxjs-tap-log-demo />
+    </ui-example>
+  </ui-section-wrapper>
+
+  <!-- 5. The app's error pipeline logs (LIVE failure trace) -->
+  <ui-section-wrapper
+    title="The app's error pipeline logs — Failure.chain is the narrative"
+  >
+    <ui-content-group-wrapper
+      title="Read the cause chain before you reach for breakpoints"
+    >
+      <ui-text-block
+        text="Because this app converts exceptions into chained Failures at the data boundary (see the Exception-handling screen), a failure arrives at the UI with its whole cause chain attached — the cache read failure, caused by the network failure underneath, caused by the timeout. The Failure.chain string renders that as a multi-line 'caused by:' trace, oldest first, and the Logger prints it. So before you open DevTools, read the failure card on screen and the matching log line: the chain usually tells you which layer failed and what triggered it, which is the same narrowing the manual toolboxes do. Pick a scenario below to see the exact trace the real pipeline produces."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.failureChain"
+        [defaultOpen]="false"
+        caption="src/core/error-handling/failure.ts — kind, severity, message, chain."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-example label="Live — Failure.chain trace from the REAL guards">
+      <app-failure-trace-demo />
+    </ui-example>
+  </ui-section-wrapper>
+
+  <!-- 6. Console discipline — the Logger -->
+  <ui-section-wrapper title="Console discipline — route through the Logger">
+    <ui-content-group-wrapper
+      title="Level-gated, env-aware, never a bare console.log in a service"
+    >
+      <ui-text-block
+        text="This app wraps console.log behind a Logger (core/config/logger.ts). Every service (the repository, the data sources, the DI providers) takes a Logger and tags its output with a name and a level — debug / info / warning / error. In dev, everything is emitted; in production, only error-level lines survive (enableLogs is false for prod). That keeps the console clean for users and noisy for developers. The discipline rule: never write a bare console.log in a service — route through the Logger so the prod build can strip it, the level is consistent, and the tag tells you WHICH service emitted the line. Reserve raw console.log for one-off scratch debugging in a component, and delete it before the commit."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.consoleDiscipline"
+        [defaultOpen]="true"
+        caption="src/core/config/logger.ts — one gate, per environment."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Debugging signals — effect logging (LIVE) -->
+  <ui-section-wrapper title="Debugging signals — effect() is the reactive console.log">
+    <ui-content-group-wrapper
+      title="Track dependencies automatically; log on change"
+    >
+      <ui-text-block
+        text="Signals are debugged with effect(). An effect tracks every signal you read inside it and re-runs only when one of those signals changes, during the same change-detection cycle (after the template has re-rendered). That makes it the idiomatic way to 'console.log a signal' — you don't have to enumerate dependencies by hand, and the effect lives in the injection context so its lifetime is owned by the component (no manual ngOnDestroy). The OnPush + signals story is what makes this cheap: a signal write schedules change detection on EXACTLY the components that read it — no zone, no markForCheck — so the effect fires precisely when the value the user sees changes. The golden rule: log from an effect, never WRITE other signals from one (that way lies change-detection loops)."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.effectLogging"
+        [defaultOpen]="true"
+        caption="effect() tracks count() and double() automatically."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-example label="Live — signal effect log">
+      <app-effect-log-demo />
+    </ui-example>
+  </ui-section-wrapper>
+
+  <!-- 8. Common pitfalls -->
+  <ui-section-wrapper title="Common pitfalls — the four Angular-specific bug classes">
+    <ui-content-group-wrapper
+      title="ExpressionChangedAfterItHasBeenChecked"
+    >
+      <ui-text-block
+        text="The classic Angular dev-mode error. It fires when a value the template already read is mutated DURING the same change-detection pass. Dev mode runs CD twice on purpose to surface this — it is a warning, not noise: a value that changes after being checked will mis-render. The usual triggers are a signal written synchronously in a child's ngOnInit that the parent template already read, an effect that writes a signal the template reads, or a function called in the template that returns a new reference each cycle. Fix by deferring the write, or by deriving with computed instead of effecting."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.expressionChanged"
+        [defaultOpen]="true"
+        caption="Typical triggers and their fixes."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper
+      title="Change-detection loops"
+    >
+      <ui-text-block
+        text="A signal write schedules CD; if a CD run writes the same signal again, you loop forever (Angular caps it at ERROR). The most common shape is an effect that writes a signal it also reads indirectly. The fix is almost always 'derive, don't effect' — use computed for derived values, or linkedSignal if the derived value must be overridable. The snippet below shows the anti-pattern and the fix."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.cdLoops"
+        [defaultOpen]="true"
+        caption="Anti-pattern (effect writes a read signal) → computed fix."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper
+      title="Leaked subscriptions and effects"
+    >
+      <ui-text-block
+        text="The slow, silent bug. A subscription that outlives its component keeps running, holding references and writing to destroyed state. Two modern cures: takeUntilDestroyed ties an RxJS subscription to the component's injection context (auto-unsubscribe on destroy), and effects declared in an injection context are auto-cleaned on component destroy — no manual ngOnDestroy. The anti-pattern is a raw .subscribe() in a service with no teardown; it lives for the page lifetime and silently leaks."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.leakedSubs"
+        [defaultOpen]="true"
+        caption="takeUntilDestroyed + injection-context effects auto-clean."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

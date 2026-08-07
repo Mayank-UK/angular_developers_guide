@@ -1,0 +1,188 @@
+<div class="page">
+  <!-- 1. Mental model -->
+  <ui-section-wrapper title="Design system — the mental model">
+    <ui-content-group-wrapper title="Tokens are the single source of truth">
+      <ui-text-block text="Every visual decision in this app — colour, spacing, type, radius, elevation — is a CSS custom property defined once in src/ui/design-system/tokens.css and consumed everywhere via var(--…). A component never hard-codes a hex code or a pixel value; it reads a token. That single rule is what makes the design system a system rather than a mood board: change the token once, and every consumer updates in lockstep." />
+      <ui-text-block text="The same file owns both themes. Light values live under :root; dark values live under [data-theme='dark'] and only re-declare what changes. Dark mode is therefore not a second stylesheet or a class on every component — it is one attribute on <html>, flipped by a signal. Components do not know which theme is active; they just read var(--color-surface) and the cascade hands them the right value." />
+      <ui-text-block text="This screen documents that system by reading the real token values out of the live document and rendering them, so what you see below is exactly what the rest of the app paints with — not invented examples. Every demo on this page is itself built from the primitives it documents." />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="The token file (verbatim)">
+      <ui-code-block
+        language="css"
+        [code]="snippets.tokensRoot"
+        caption=":root — the light defaults."
+        [defaultOpen]="true"
+      />
+      <ui-code-block
+        language="css"
+        [code]="snippets.tokensDark"
+        caption="[data-theme='dark'] — only the values that change."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. Colour tokens -->
+  <ui-section-wrapper title="Colour tokens">
+    <ui-content-group-wrapper title="Brand, surfaces, on-colours, and severity">
+      <ui-text-block text="The palette is a neutral slate base with a single indigo accent, used sparingly so the page reads as mostly-neutral with clear emphasis points. Each token below is painted with its own var(--…) value, and the resolved hex is read live from getComputedStyle(document.documentElement) — so when you flip the theme in the next section, every swatch and every value string updates with it. Note the on-* tokens: these are the foreground colours meant to sit on their paired surface (on-primary on primary, on-surface on surface, and so on)." />
+      <ui-example label="Live swatches — values read from the running document">
+        <app-colour-palette-demo />
+      </ui-example>
+      <ui-code-block
+        language="css"
+        [code]="snippets.consuming"
+        caption="Components consume tokens with var() — dark mode then just works."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. Spacing scale -->
+  <ui-section-wrapper title="Spacing & sizing scale">
+    <ui-content-group-wrapper title="Seven steps, doubled each rung">
+      <ui-text-block text="The spacing scale is geometric: 2 / 4 / 8 / 16 / 32 / 64 / 128 px (xxs through xxl). Every rung doubles, which keeps the rhythm consistent and makes the right gap obvious — most spacing is var(--space-sm) or var(--space-md), section padding is var(--space-lg), and page-level breathing room is var(--space-xl). The same scale backs padding, margin, and gap, so the whole app shares one vertical rhythm. The ramp below reads its widths straight from the DSSizes TS mirror." />
+      <ui-example label="The spacing ramp — bar widths are the real token values">
+        <app-spacing-scale-demo />
+      </ui-example>
+      <ui-code-block
+        language="ts"
+        [code]="snippets.dsSizes"
+        caption="DSSizes — the TS mirror of the --space-* tokens."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. Typography -->
+  <ui-section-wrapper title="Typography">
+    <ui-content-group-wrapper title="Three font families + a fluid-to-fixed ramp">
+      <ui-text-block text="Three font families cover every need: --font-display (Montserrat) for headings, --font-body (Inter) for copy and UI chrome, and --font-mono (JetBrains Mono) for code and token labels. The type scale mixes fluid clamp() sizes for the display tiers (they scale smoothly with the viewport between two bounds) and fixed px sizes for body, caption, and overline (they stay predictable at small sizes where a few pixels matter). Each line below renders at its own token size." />
+      <ui-example label="Type scale — each line sized by its own token">
+        <app-typography-scale-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. Radius + shadow + layout -->
+  <ui-section-wrapper title="Radius, elevation & layout">
+    <ui-content-group-wrapper title="Four radii, four shadows, two layout constants">
+      <ui-text-block text="Radius has four steps: sm (4px) for chips and inputs, md (8px) for cards and examples, lg (16px) for sections, and pill (9999px) for tags and the accent bar. Elevation has four shadows that escalate with importance — button/card, its hover state, drawer, and modal. Crucially the shadow tokens darken in dark mode (see the dark block above): the same rgba-on-white would vanish on a dark ground, so the dark overrides redeclare them against black. The DSShadows TS mirror references the CSS variables, so JS-applied shadows respect the theme for free. Two layout constants (--content-max-width and --header-height) fix the reading measure and the app shell height." />
+      <ui-example label="Radius tiles, shadow tiles, and layout constants">
+        <app-radius-shadow-demo />
+      </ui-example>
+      <ui-code-block
+        language="ts"
+        [code]="snippets.dsShadows"
+        caption="DSShadows — box-shadow strings that reference the runtime tokens."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Dark mode / ThemeService -->
+  <ui-section-wrapper title="Dark mode — ThemeService & [data-theme]">
+    <ui-content-group-wrapper title="One signal, one attribute, one localStorage key">
+      <ui-text-block text="Dark mode is three concerns wired together. ThemeService holds the active mode as a signal ('light' | 'dark'); an effect writes it to document.documentElement.dataset.theme (the attribute tokens.css keys off of) and persists it to localStorage under 'adg-theme'. The initial value is resolved once at construction: stored preference first, then the OS prefers-color-scheme media query, then light. Because the mode is a signal, every template that reads it re-renders on a flip; because the DOM mutation happens in an effect, the attribute never drifts from the signal. No component subscribes to theme changes — they just read var(--…) and the cascade does the rest." />
+      <ui-text-block text="Toggle the theme below. Because ThemeService writes data-theme to <html>, the flip is global: the header, the page chrome, and every primitive on this screen repaint together. The readouts confirm the mechanism by re-reading getComputedStyle on the document root after each flip." />
+      <ui-example label="Live theme toggle — flips the whole app">
+        <app-theme-demo />
+      </ui-example>
+      <ui-code-block
+        language="ts"
+        [code]="snippets.themeService"
+        caption="ThemeService — signal + effect + localStorage + prefers-color-scheme."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. TS mirrors -->
+  <ui-section-wrapper title="The TS mirrors — DSSizes & DSShadows">
+    <ui-content-group-wrapper title="When CSS isn't enough">
+      <ui-text-block text="CSS custom properties are the source of truth, but some code paths need the same values in TypeScript: a dynamically computed gap, a canvas drawing, an animation distance. Two small mirrors expose them. DSSizes is a plain const object literal (xxs…xxl → 2…128) with a literal-union type, so the scale is both a runtime value and a type. DSShadows maps keys to box-shadow strings built with var(--…), so JS-applied shadows still track the theme. Prefer the CSS variables directly in stylesheets; reach for the mirrors only from TypeScript." />
+      <ui-text-block text="The mirrors are deliberately not auto-generated. They are tiny (seven numbers, four shadows), change rarely, and staying hand-written keeps them legible and dependency-free. If you add a token to tokens.css, add it to the matching mirror in the same commit." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.dsSizes"
+        caption="DSSizes — const object + keyof literal union (never enum)."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.dsShadows"
+        caption="DSShadows — var()-built strings so JS shadows follow the theme."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. A note on z-index -->
+  <ui-section-wrapper title="A note on z-index (not tokenised)">
+    <ui-content-group-wrapper title="Deliberate omission">
+      <ui-text-block text="You will notice tokens.css has no z-index scale. That is deliberate. This app keeps stacking contexts shallow (header, drawer, modal, snackbar) and authoring each z-index locally against small literal numbers is clearer than a token ladder that no one remembers to consult. If the app grew a deeper stacking hierarchy — overlapping drawers, popovers inside modals, tooltips above everything — the right move would be to add a --z-* scale here and consume it everywhere, the same way --shadow-* is handled. The trade-off to teach is: tokenise when a value is shared or when the ordering matters globally; leave it local when it doesn't." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 9. UI primitives -->
+  <ui-section-wrapper title="The UI primitive library">
+    <ui-content-group-wrapper title="Eight standalone OnPush components">
+      <ui-text-block text="The design system's runtime surface is eight presentational primitives in src/ui/components/. Each is standalone, OnPush, uses signal inputs, and consumes the tokens directly — none of them imports a DTO, a DAO, or HttpClient. They are the building blocks every screen composes. Use them rather than reinventing the same card or code well. The gallery below renders one instance of each; the sections that follow describe each in detail." />
+      <ui-example label="Gallery — every primitive, live">
+        <app-primitives-gallery-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="ui-section-wrapper — the page's primary unit">
+      <ui-text-block text="A titled, surface-tinted block with an accent bar on the title. This is the top of the content hierarchy: a page is a stack of SectionWrappers. The title carries a coloured accent so sections are scannable; generous vertical margin separates siblings so long pages don't read as a wall. Use it once per topic on a page." />
+      <ui-code-block language="ts" [code]="snippets.sectionWrapper" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="ui-content-group-wrapper — a labelled sub-cluster">
+      <ui-text-block text="One step below the section title. Rendered as an overline (uppercase, letter-spaced, muted) so the hierarchy reads clearly: section title → overline label → body/code/example. Use it to cluster related ideas inside a section without promoting each one to its own section." />
+      <ui-code-block language="ts" [code]="snippets.contentGroup" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="ui-text-block — a paragraph of body copy">
+      <ui-text-block text="A full-width paragraph in the muted on-surface-variant colour, with a 1.7 line-height so copy breathes. Kept string-only so multi-line examples render predictably (white-space: pre-line preserves authored line breaks). Use it for prose; reach for semantic <p>, <ul>, etc. only when you need list semantics this primitive doesn't model." />
+      <ui-code-block language="ts" [code]="snippets.textBlock" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="ui-code-block — collapsible, copyable listing">
+      <ui-text-block text="A monospace code listing with a language label, a copy button, and an optional caption. Collapsed by default — pages full of examples would otherwise become a wall of code; the label + toggle stays visible and the source is one click away. The copy button works whether open or closed. Pair it with Example: the code beside (or above) the live demo it produces." />
+      <ui-code-block language="ts" [code]="snippets.codeBlock" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="ui-example — the live-demo frame">
+      <ui-text-block text="A visually distinct container for live, interactive demonstrations. Unlike CodeBlock (a static listing), Example uses a dashed border on the surface-variant surface with a '↳ Live example' overline, signalling 'this is something you can look at and touch, not just read.' Every demo on this screen is wrapped in one. Use it to set interactive content apart from prose." />
+      <ui-code-block language="ts" [code]="snippets.example" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="ui-link-card — a navigation card">
+      <ui-text-block text="A title, an optional description, and a routerLink — the card lifts on hover (translateY + the primary border + the hover shadow) and the arrow nudges right. Used by the hub screens to render their sub-screen grids. The item shape (LinkCardItem) is defined locally in the component, not imported from domain/, so the UI layer stays decoupled from the data layer; hubs pass plain objects." />
+      <ui-code-block language="ts" [code]="snippets.linkCard" />
+      <ui-example label="A live link-card">
+        <ui-link-card [item]="sampleCard" />
+      </ui-example>
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="ui-show-error — full-screen blocking failure">
+      <ui-text-block text="The critical end of the error pipeline. A full-screen, centred, blocking surface for critical failures, with a severity-driven glyph and an optional Retry that emits an output the host wires up. It is deliberately decoupled from core/ and domain/: it accepts plain inputs (message, severity, kind) instead of importing the Failure type, so the host view is responsible for translating its domain model into those fields. See it in the gallery above (constrained to a frame so its 60vh min-height doesn't take over the page)." />
+      <ui-code-block language="ts" [code]="snippets.showError" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="ui-theme-toggle — the theme switch">
+      <ui-text-block text="A single button that calls ThemeService.toggle() and renders a sun/moon glyph from the mode signal. It is the entire public API of the theme system in component form — the header mounts one, and so does the dark-mode demo above. Use it anywhere you want a user-facing theme affordance; never re-implement the toggle logic, call the service." />
+      <ui-code-block language="ts" [code]="snippets.themeToggle" />
+      <ui-example label="The live theme-toggle primitive">
+        <div class="toggle-row">
+          <ui-theme-toggle />
+          <span class="toggle-note">flips the whole app — try it</span>
+        </div>
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 10. Composition rule -->
+  <ui-section-wrapper title="When to make a new primitive">
+    <ui-content-group-wrapper title="Single-use → local function; shared → primitive">
+      <ui-text-block text="The eight primitives above are shared because more than one screen uses them. The rule this app follows: if a component is used in a single file, make it a local component (or a function) inside that view; if it is used across files, promote it into src/ui/components/. The design system is not a preemptive library — it is the set of components that earned their way out of a single screen by being reused. Every primitive here was extracted, not invented." />
+      <ui-text-block text="The same rule applies to tokens: add a custom property to tokens.css only when a value is shared across components or themes. A one-off colour or spacing belongs inline in the component's stylesheet. The system stays small on purpose." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

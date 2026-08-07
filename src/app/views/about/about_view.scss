@@ -1,0 +1,268 @@
+:host {
+  display: block;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Hero                                                                        */
+/* -------------------------------------------------------------------------- */
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-md);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(
+      120% 140% at 0% 0%,
+      color-mix(in srgb, var(--color-primary) 14%, transparent) 0%,
+      transparent 55%
+    ),
+    var(--color-surface-tint);
+  border: 1px solid var(--color-outline);
+}
+
+.kicker {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.headline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-display-sm);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-on-surface);
+  letter-spacing: -0.01em;
+}
+
+.lede {
+  margin: 0;
+  max-width: 60ch;
+  font-size: var(--text-body);
+  line-height: 1.7;
+  color: var(--color-on-surface-variant);
+
+  strong {
+    color: var(--color-on-surface);
+    font-weight: 600;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Stat tiles                                                                  */
+/* -------------------------------------------------------------------------- */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+@media (min-width: 560px) {
+  .stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-outline);
+  box-shadow: var(--shadow-button-card);
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-title-lg);
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: var(--text-caption);
+  color: var(--color-on-surface-variant);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Coverage grid                                                               */
+/* -------------------------------------------------------------------------- */
+
+.coverage {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-sm);
+}
+
+@media (min-width: 640px) {
+  .coverage {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Coverage + credit cards share the same hover-card shell — group the shared
+ * declarations so the compiled CSS isn't duplicated (and the budget stays
+ * honest). Title/arrow/note rules that differ stay per-card. */
+.coverage-card,
+.credit-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-variant);
+  border: 1px solid var(--color-outline);
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.coverage-card:hover,
+.credit-card:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-button-card-hover);
+  transform: translateY(-1px);
+}
+
+.coverage-index {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: 0.1em;
+  color: var(--color-primary);
+}
+
+.coverage-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-title-sm);
+  font-weight: 600;
+  color: var(--color-on-surface);
+}
+
+.coverage-card:hover .coverage-title {
+  color: var(--color-primary);
+}
+
+.coverage-title .arrow {
+  transition: transform 0.15s ease;
+}
+
+.coverage-card:hover .coverage-title .arrow {
+  transform: translateX(4px);
+}
+
+.coverage-note {
+  font-size: var(--text-body-sm);
+  line-height: 1.6;
+  color: var(--color-on-surface-variant);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Stack                                                                       */
+/* -------------------------------------------------------------------------- */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+  border-top: 1px solid var(--color-outline);
+}
+
+.stack-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-xxs);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-outline);
+}
+
+@media (min-width: 640px) {
+  .stack-row {
+    grid-template-columns: 12rem 1fr;
+    gap: var(--space-md);
+    align-items: baseline;
+  }
+}
+
+.stack-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-body-sm);
+  letter-spacing: 0.04em;
+  color: var(--color-primary);
+  text-transform: uppercase;
+}
+
+.stack-value {
+  font-size: var(--text-body-sm);
+  line-height: 1.6;
+  color: var(--color-on-surface);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Credits                                                                     */
+/* -------------------------------------------------------------------------- */
+
+.credits {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+@media (min-width: 640px) {
+  .credits {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.credit-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-family: var(--font-mono);
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-on-surface);
+}
+
+.credit-card:hover .credit-title {
+  color: var(--color-primary);
+}
+
+.credit-title .arrow {
+  font-size: var(--text-caption);
+  transition: transform 0.15s ease;
+}
+
+.credit-card:hover .credit-title .arrow {
+  transform: translate(2px, -2px);
+}
+
+.credit-note {
+  font-size: var(--text-body-sm);
+  line-height: 1.6;
+  color: var(--color-on-surface-variant);
+}

@@ -1,0 +1,23 @@
+<div class="code-block">
+  <div class="bar">
+    <button
+      type="button"
+      (click)="toggleOpen()"
+      [attr.aria-expanded]="open()"
+      class="lang"
+    >
+      <span class="caret">{{ open() ? '▾' : '▸' }}</span>
+      {{ language() }}
+    </button>
+    <button type="button" (click)="copy($event)" class="copy">
+      {{ copied() ? '✓ copied' : 'copy' }}
+    </button>
+  </div>
+
+  @if (open()) {
+    <pre class="source"><code>{{ code() }}</code></pre>
+    @if (caption()) {
+      <div class="caption">{{ caption() }}</div>
+    }
+  }
+</div>

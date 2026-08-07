@@ -1,0 +1,136 @@
+<div class="page">
+  <!-- 1. Mental model -->
+  <ui-section-wrapper title="What routing solves">
+    <ui-content-group-wrapper title="The URL is your source of truth">
+      <ui-text-block text="A plain Angular app is a single HTML page: clicking around swaps components in memory, but the browser's URL never changes — so refresh breaks, the back button is dead, and you can't bookmark or share a specific screen. The Angular Router fixes that by treating the URL as state: each path maps to a component, and changing the path renders the matching screen WITHOUT a full page reload. That is what makes a single-page app feel like a real website. The Router is provided once at the root via provideRouter(routes); the shell renders a single <router-outlet> where the matched component appears, so the shared chrome (header, theme toggle, drawer) lives in ONE place instead of being repeated on every screen." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.bootstrap"
+        caption="Booting the router — provideRouter in app.config.ts + a single <router-outlet> in the shell."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper title="This app's own route paths">
+      <ui-text-block text="URLs live in ONE place — src/app/layout/route-paths.ts — so screens, hubs, and the shell reference the same constants instead of string literals. It is a const-object + literal union (never an enum): this project targets erasable-only TypeScript, and enums are not erasable. The route table (src/app/app.routes.ts) imports nothing from here — paths are just convenience constants for the components that build links." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.routePaths"
+        caption="RoutePaths — the single source of truth for URLs."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. Routes as data -->
+  <ui-section-wrapper title="Routes as data — the route table">
+    <ui-content-group-wrapper title="A declarative tree, not a switch of ifs">
+      <ui-text-block text="The whole app is described as a Routes array — a plain data structure. Each entry has a path, a way to load its component (loadComponent for lazy single components, or component for eager ones), and optional metadata (title, data, guards, resolver, children). The router matches first-wins, so order matters: put specific paths before wildcards, and the ** catch-all LAST. This app lazy-loads every screen with loadComponent so the initial bundle ships only the shell + the landing view — everything else is fetched on first navigation." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.realRoutes"
+        caption="This app's real src/app/app.routes.ts (excerpt) — lazy loadComponent + title on every route, ** → home."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. Lazy loading + nested child routes + data/title -->
+  <ui-section-wrapper title="Lazy loading, nested child routes & route data">
+    <ui-content-group-wrapper title="loadComponent vs loadChildren, and the nested outlet">
+      <ui-text-block text="loadComponent lazy-loads a single standalone component — the modern default for a leaf screen; it returns the component from a dynamic import, which the bundler splits into its own chunk. loadChildren lazy-loads a WHOLE child Routes array, used for a feature area that ships its own sub-layout + nested <router-outlet>. Nesting routes nests the URL too: /admin/users matches AdminShell (which renders a sub-outlet) wrapping AdminUsers. A child route's component renders into the nearest ancestor <router-outlet>, so a nested layout is just a component that contains another <router-outlet>." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.lazyAndChildren"
+        caption="loadComponent (leaf) vs loadChildren + children with a nested <router-outlet>."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper title="Route title + data — metadata on the route">
+      <ui-text-block text="Every route accepts a title (a string, or a function of the route + data) consumed by the router's TitleStrategy to set document.title. It also accepts a data bag for anything else you want attached — breadcrumbs, scopes, labels — readable reactively in the component via route.data. This is the bridge this app uses to keep the header label and the document title in sync: the title sits on the route, not on the component." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.dataAndTitle"
+        caption="title + data on a route, and reading route.data reactively."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. Navigation: routerLink, routerLinkActive, Router.navigate -->
+  <ui-section-wrapper title="Navigating — routerLink, routerLinkActive & Router.navigate">
+    <ui-content-group-wrapper title="Declarative vs imperative, pick by intent">
+      <ui-text-block text="You navigate two ways. DECLARATIVE: write routerLink on an element (it renders an <a>) — used wherever navigation is a static UI affordance (a nav bar, a card). Add routerLinkActive to drop a class on the link when its target matches the current URL — exactly what nav bars need; pass [routerLinkActiveOptions] = '{ exact: true }' so '/' doesn't match every path. IMPERATIVE: call Router.navigate / navigateByUrl from a handler — used when navigation is a side-effect of logic (after a successful login, a form submit, a timer). Reach for routerLink first; reach for Router.navigate only when there is no element to attach the link to." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.routerLinkActive"
+        caption="routerLink + routerLinkActive in templates, and Router.navigate in a handler."
+        [defaultOpen]="true"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. LIVE: query params + fragments (real ActivatedRoute) -->
+  <ui-section-wrapper title="Live — query params & fragments (real ActivatedRoute)">
+    <ui-content-group-wrapper title="Optional, filter-style state in the URL">
+      <ui-text-block text="Path params are for resource identity (which record — see the mini-router below). For OPTIONAL, filter-style state (a search term, a sort order, a page number), use the query string — ?q=ada — and the fragment — #top. ActivatedRoute exposes both as Observables; convert them to signals with toSignal. Writing them is a Router.navigate on the current route (relativeTo: this.route) with queryParamsHandling: 'merge' so other params survive. Because this view is on a real route, the demo below is genuine: type in the box and watch THIS screen's URL update and the address bar follow." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.queryParams"
+        caption="Reading ?q= / #frag reactively and writing them via Router.navigate."
+        [defaultOpen]="true"
+      />
+      <ui-example label="Type a filter — the URL's ?q= updates live; pick a fragment to set #frag">
+        <app-nav-query-params-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Redirects + wildcard -->
+  <ui-section-wrapper title="Redirects & the wildcard catch-all">
+    <ui-content-group-wrapper title="Redirect declaratively, catch unknown paths">
+      <ui-text-block text="Redirect with redirectTo (and pathMatch: 'full' when the ENTIRE path must match, 'prefix' otherwise). The wildcard path '**' catches every unmatched URL and must be the LAST entry — the router matches first-wins, so a wildcard earlier would shadow everything below it. This app redirects '**' to '' (home) so a typo never strands the user on a blank screen." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.redirectAndWildcard"
+        caption="redirectTo + pathMatch, and the '**' catch-all (always last)."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Functional guards -->
+  <ui-section-wrapper title="Functional guards — canMatch, canActivate, canDeactivate">
+    <ui-content-group-wrapper title="Functions, not classes — each guards a different phase">
+      <ui-text-block text="Modern Angular guards are FUNCTIONS (CanMatchFn / CanActivateFn / CanDeactivateFn), not class interfaces. Return a boolean, a UrlTree (redirect), or an Observable/Promise for async checks. Each fires at a different phase: canMatch runs during MATCHING (decides if a route is even eligible — the modern replacement for the old canActivate guarding lazy chunks); canActivate runs after match, before activation; canDeactivate runs before LEAVING a route, and is the only guard that receives the COMPONENT instance — so it can ask 'are you dirty?' before letting the user navigate away. Inject your auth service inside the function; redirect on failure by returning router.parseUrl('/login')." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.guards"
+        caption="requireAuth (canMatch) + confirmLeave (canDeactivate) + how to attach them."
+        [defaultOpen]="true"
+      />
+      <ui-example label="A canDeactivate guard — try to leave a dirty form">
+        <app-nav-can-deactivate-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. Functional resolvers -->
+  <ui-section-wrapper title="Functional resolvers — pre-fetch before activation">
+    <ui-content-group-wrapper title="ResolveFn — data ready when the component is">
+      <ui-text-block text="A resolver (ResolveFn<T>) pre-fetches data BEFORE the route activates, so the component renders with its data already in hand instead of showing a skeleton and fetching in ngOnInit. Modern resolvers are functions too. Resolve through your DI tokens (POST_REPOSITORY, GET_POSTS_USE_CASE) — a view never imports a DTO, DAO, or HttpClient directly. The resolved value lands in route.data under the key you used in resolve: { ... }, and is readable reactively in the component. Note: resolvers BLOCK navigation until they complete, so prefer them for MUST-HAVE data; for non-blocking data, fetch in the component with signals instead." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.resolver"
+        caption="ResolveFn through the DI seam, attached via resolve: { post: resolvePost }."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 9. LIVE centerpiece — the simulated mini-router -->
+  <ui-section-wrapper title="Live — a whole mini-router (nested outlet, params, guard, 404)">
+    <ui-content-group-wrapper title="Everything above, clicking together">
+      <ui-text-block text="The centerpiece. A self-contained simulated router (built on signals — see the note below) shows the concepts working together: a shared shell that never re-mounts, NavLink-style active state, dynamic :id params read from the URL, a query string, a canMatch-style auth guard that redirects /compose → /login when signed out, and a wildcard 404. Click through it: the URL readout updates, the matched screen renders into the 'outlet' body, but the shell stays put — exactly how a real nested <router-outlet> behaves. The code blocks throughout this page show the real API you would ship in app.routes.ts; this simulation only exists so you can click through the concepts without leaving the screen or polluting the real route table with demo child paths." />
+      <ui-example label="Navigate the mini-app — watch the URL, the outlet, and the guard">
+        <app-nav-mini-router-demo />
+      </ui-example>
+      <ui-text-block text="Why simulated, not a real nested outlet: nesting another real <router-outlet> here would mean adding demo child routes to src/app/app.routes.ts. Those would be addressable from anywhere in the app (colliding with the real route namespace) and would ship in the production bundle. The simulated router reproduces a router's behaviour — history stack, parsed params, a guard — in local component state, so the demo is fully self-contained and the real route table stays untouched." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

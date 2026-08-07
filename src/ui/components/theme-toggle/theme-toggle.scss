@@ -1,0 +1,22 @@
+:host {
+  display: inline-block;
+}
+
+button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-body);
+  font-family: var(--font-body);
+  color: var(--color-on-surface-variant);
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+button:hover {
+  background-color: var(--color-surface-variant);
+  color: var(--color-on-surface);
+}

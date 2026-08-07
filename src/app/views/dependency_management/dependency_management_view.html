@@ -1,0 +1,192 @@
+<div class="page">
+  <!-- 0. What DI is and why -->
+  <ui-section-wrapper
+    title="Dependency management — the Angular way in this app"
+  >
+    <ui-content-group-wrapper
+      title="Separate 'build it' from 'use it'"
+    >
+      <ui-text-block text="A use case needs a repository; a repository needs a remote source, a database, and a logger; the remote source needs HttpClient. If every class constructs its own dependencies, those couplings are scattered and untestable — PostRepositoryImpl would hard-code 'new PostApiService(...)' and you could never feed it a fake. Dependency management pulls all of that construction into one debuggable place and hands already-built dependencies to consumers. Each consumer declares what it needs; the DI system decides what concrete thing to give it. The win is threefold: one place to see and change the wiring; the ability to swap implementations (real ↔ fake) per environment; and trivial testability, because tests override a token with a fake and the consumer never notices." />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="Angular has first-class DI — use it instead of a hand-rolled container"
+    >
+      <ui-text-block text="The React sibling of this app has no DI standard, so it hand-rolls a tiny Container class (register once at startup, resolve anywhere via typed accessors). Angular ships DI in the platform: InjectionTokens name the contracts, providers map tokens to implementations, and inject() resolves them anywhere in an injection context. The trade-offs the React guide had to make (Context vs a DI library vs a hand-rolled locator) simply do not exist here — there is one idiomatic answer, and it is hierarchical (root → route → component), which a flat service locator cannot be." />
+      <ui-code-block
+        language="text"
+        [code]="snippets.contrast"
+        [defaultOpen]="true"
+        caption="Angular native DI vs the React sibling's hand-rolled container."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 1. InjectionToken — the seam -->
+  <ui-section-wrapper title="InjectionToken — naming the seam">
+    <ui-content-group-wrapper
+      title="A token is a typed, named slot — not an implementation"
+    >
+      <ui-text-block text="An InjectionToken is the seam. It is a typed, named slot that says 'someone will provide a PostRepository here' without saying which implementation fills it. That decoupling is what lets the same consumer run against the fake in dev and the live REST backend in staging. This app's tokens live in src/core/di/tokens.ts: APP_CONFIG, POST_REPOSITORY, GET_POSTS_USE_CASE. Crucially, core/ may import @angular/core but domain/ must stay framework-free — so the tokens reference the domain contracts via TYPE-ONLY imports (no runtime coupling). The domain layer never depends on Angular; it is pure TypeScript that could be lifted into a Node script unchanged." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.tokens"
+        [defaultOpen]="true"
+        caption="src/core/di/tokens.ts — APP_CONFIG, POST_REPOSITORY, GET_POSTS_USE_CASE."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. providers + provideX factory functions -->
+  <ui-section-wrapper
+    title="providers + provideX() — registering the wiring"
+  >
+    <ui-content-group-wrapper
+      title="provideData(config) is Angular's container.initialize()"
+    >
+      <ui-text-block text="provideData(config) in src/data/providers.ts is the Angular equivalent of the React guide's container.initialize(). It takes the AppConfig, picks the fake-vs-live remote + local implementations from config.wiring, and binds the domain contracts (PostRepository, GetPostsUseCase) to their tokens through factories. It returns EnvironmentProviders — a special provider bundle intended for the root injector, wired once in app.config.ts. HttpClient is intentionally NOT provided here: the fake path needs no HTTP, and the live path consumes provideHttpClient(withInterceptors([retryInterceptor])) registered alongside it in app.config.ts." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.providers"
+        [defaultOpen]="true"
+        caption="src/data/providers.ts — provideData(config) wires fake-vs-live + binds the tokens."
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="The four provider recipes + multi-providers"
+    >
+      <ui-text-block text="Every provider maps a token to a value one of four ways. useValue hands over a plain instance. useClass asks Angular to new up a class (with its own deps resolved recursively). useFactory calls a function — useful when construction needs logic or deps you want to pass positionally via the deps array. useExisting aliases another token (handful for surfacing one implementation under multiple names). On top of those, multi: true flips a provider from override-semantics to APPEND-semantics: every registration is concatenated into an array the consumer injects. That is how plug-in lists work — HTTP_INTERCEPTORS, form validators, error handlers — and Angular itself uses it for provideHttpClient's interceptor chain." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.recipes"
+        [defaultOpen]="true"
+        caption="useValue / useClass / useFactory / useExisting / multi: true."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. inject() vs constructor -->
+  <ui-section-wrapper title="inject() — the modern resolution API">
+    <ui-content-group-wrapper
+      title="Function form vs constructor parameters"
+    >
+      <ui-text-block text="Angular offers two ways to resolve a token. The modern form is the inject() function: declare a readonly field initialised with inject(TOKEN), and Angular resolves it in an injection context (the constructor's). It reads cleanly next to signals, works in field initialisers, and is the ONLY option inside places that have no constructor of their own — functional HttpInterceptorFn, CanActivateFn, ResolveFn, and useFactory bodies. The classic form is constructor parameters typed by class/token, which Angular reads via runtime emitDecoratorData metadata. Both produce the same singleton; this app uses inject() throughout because it lines up with the signal-based, standalone-component style the rest of the codebase uses." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.injectVsCtor"
+        [defaultOpen]="true"
+        caption="inject(TOKEN) (modern) vs constructor parameters (classic)."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. Hierarchical injectors -->
+  <ui-section-wrapper title="Hierarchical injectors — root, route, component">
+    <ui-content-group-wrapper
+      title="Injectors form a tree; lowest injector wins"
+    >
+      <ui-text-block text="Unlike the React guide's flat locator (one module-level Map), Angular injectors form a TREE. The root injector holds everything in app.config.ts providers plus every provideX() helper. Below it sit route injectors (a lazy feature can wire its own backend via the route's providers field) and component injectors (the providers array on a @Component). When a token is requested, Angular walks UP from the requesting component until it finds a provider — so the first match wins. That means a component-level provider SHADOWS a root-level one inside that subtree only, which is exactly the override the live demo below demonstrates. Providers are singletons WITHIN their injector and die with it — a provider on a component's providers is rebuilt every time that component mounts." />
+      <ui-code-block
+        language="text"
+        [code]="snippets.hierarchy"
+        [defaultOpen]="true"
+        caption="root → route → component → child. The lowest injector in the tree wins."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. Fake-vs-live environment swap -->
+  <ui-section-wrapper
+    title="Fake-vs-live wiring — one environment field, full graph swap"
+  >
+    <ui-content-group-wrapper
+      title="AppConfig.wiring chooses the leaf implementations"
+    >
+      <ui-text-block text="Swapping fake ↔ live is a STARTUP decision driven by environment config. Each environment file (src/environments/environment.ts / .development.ts / .staging.ts) carries a wiring: { remote: 'fake' | 'live', db: 'fake' | 'live' } field. angular.json's fileReplacements swaps the whole file per build configuration, createAppConfig(environment) freezes it into a typed AppConfig, and provideData(config) reads config.wiring to pick FakeApiService vs PostApiService and FakeAppDatabase vs AppDatabaseImpl. Change one field in the relevant environment file, rebuild, and the entire object graph re-wires — the tokens, use case, repository impl, and error pipeline are all the same production code; only the leaf data sources swap. No view changes." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.envSwap"
+        [defaultOpen]="true"
+        caption="src/environments/environment*.ts + angular.json fileReplacements + createAppConfig."
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="getWiring(config) — runtime introspection without instanceof"
+    >
+      <ui-text-block text="The dependency-management screen needs to show 'the remote slot is currently fake' to the user. Doing that with an instanceof check would force this view to import FakeApiService / PostApiService — violating the invariant that ui/ never couples to data/ internals. So src/data/providers.ts exports a tiny value-based helper: getWiring(config) reads config.wiring and returns { remote, db }. The UI can say 'fake vs live' by reading a value, with zero data-layer imports. It mirrors the React guide's container.getWiring() and is the single sanctioned seam for runtime introspection of the wiring." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.getWiring"
+        [defaultOpen]="true"
+        caption="src/data/providers.ts — getWiring(config): value-based introspection."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Bootstrap -->
+  <ui-section-wrapper title="Bootstrap — wire once, before the first render">
+    <ui-content-group-wrapper
+      title="app.config.ts is where the root providers are assembled"
+    >
+      <ui-text-block text="main.ts calls bootstrapApplication(App, appConfig); the graph is built lazily on first inject(). app.config.ts lists the root providers: provideRouter, provideHttpClient(withInterceptors([retryInterceptor])) for the live path, and provideData(createAppConfig(environment)) for the DI seam itself. createAppConfig reads the active environment (selected by angular.json fileReplacements) and freezes it into a typed AppConfig. By the time any component mounts, every token is resolvable — there is no manual 'container.initialize()' step like the React guide needs, because Angular's bootstrap is the initialization." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.bootstrap"
+        [defaultOpen]="true"
+        caption="src/main.ts + src/app/app.config.ts — the root providers list."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. CENTERPIECE #1 — wiring inspector -->
+  <ui-section-wrapper title="Live — the wiring inspector">
+    <ui-content-group-wrapper
+      title="Read APP_CONFIG + getWiring + the resolved token instances"
+    >
+      <ui-text-block text="This is not a mock — it IS the bound graph. The inspector calls inject(APP_CONFIG), inject(POST_REPOSITORY), and inject(GET_POSTS_USE_CASE) on the real tokens wired in app.config.ts. It reads the runtime class name of each resolved instance (instance.constructor.name) to show which concrete implementation the injector built, and calls getWiring(config) for the value-based fake-vs-live readout. In the dev environment this prints FakeApiService / FakeAppDatabase; flip wiring to 'live' in environment.development.ts and rebuild, and the same readout prints PostApiService / AppDatabaseImpl. Nothing in this view imports a data-layer concrete — the introspection is through values and the platform." />
+    </ui-content-group-wrapper>
+    <ui-example label="Real inject(APP_CONFIG / POST_REPOSITORY / GET_POSTS_USE_CASE)">
+      <app-di-wiring-inspector />
+    </ui-example>
+  </ui-section-wrapper>
+
+  <!-- 8. CENTERPIECE #2 — provider recipes -->
+  <ui-section-wrapper title="Live — the four provider recipes + multi">
+    <ui-content-group-wrapper
+      title="useValue / useClass / useFactory / useExisting / multi: true"
+    >
+      <ui-text-block text="Each tile resolves one token declared on this component's own providers, one per recipe. The useFactory tile records the timestamp at which the injector first ran its factory; the 'bump change detection' button forces a re-render without re-running the factory, proving the provider is a singleton within this injector (the timestamp does not change). The useExisting tile aliases GreetingService and the readout confirms it is the SAME instance as the direct injection (===). The multi: true tile concatenates three registrations into one array — two useValue and one useFactory — exactly how HTTP_INTERCEPTORS accumulates a plug-in list." />
+    </ui-content-group-wrapper>
+    <ui-example label="useValue / useClass / useFactory / useExisting / multi — resolved live">
+      <app-di-provider-recipes />
+    </ui-example>
+  </ui-section-wrapper>
+
+  <!-- 9. CENTERPIECE #3 — child injector override -->
+  <ui-section-wrapper title="Live — component-scoped provider override">
+    <ui-content-group-wrapper
+      title="Child injector re-declares the token and wins"
+    >
+      <ui-text-block text="DEMO_MESSAGE is provided on the parent component's injector with value 'parent value (component-scoped)'. The parent reads its own binding. When the child override is mounted, the child component re-declares DEMO_MESSAGE on ITS providers — and within the child subtree the child's binding wins, while the parent's readout stays put. Toggle the child off and the child falls through to the parent injector (no providers on the child), so both read the parent value. This is the lowest-injector-wins rule made visible, and it is the same mechanism that lets a route's providers field or a dialog component shadow a root binding for its subtree only." />
+    </ui-content-group-wrapper>
+    <ui-example label="parent providers vs child providers — child wins inside its subtree">
+      <app-di-hierarchy-override />
+    </ui-example>
+  </ui-section-wrapper>
+
+  <!-- 10. How the view consumes it -->
+  <ui-section-wrapper
+    title="How a view consumes it — inject the token, switch on Result"
+  >
+    <ui-content-group-wrapper
+      title="The view holds no concrete repo, only the use-case token"
+    >
+      <ui-text-block text="The whole point of the seam: a view resolves GET_POSTS_USE_CASE through inject() and treats it as a black box that returns Result<Post[]>. The same component runs unchanged against FakeApiService (dev), PostApiService (staging), or a test fake — the token abstracts which one, and the wiring is decided once at bootstrap from environment config. No HttpClient, no DTO, no repository-implementation import in the view. That is the dependency rule made real by DI, and it is why the API-handling and database-handling screens can drive the real pipeline without ever coupling to a data-layer concrete." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.consume"
+        [defaultOpen]="true"
+        caption="A view: inject(GET_POSTS_USE_CASE) + a Result-driven signal."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

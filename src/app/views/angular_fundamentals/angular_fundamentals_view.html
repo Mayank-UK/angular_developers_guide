@@ -1,0 +1,206 @@
+<div class="page">
+  <!-- 1. What is Angular -->
+  <ui-section-wrapper title="What is Angular?">
+    <ui-content-group-wrapper title="The mental model">
+      <ui-text-block text="Angular is a full framework for building client applications out of components. A component is a TypeScript class with a template (HTML + bindings) and styles; Angular compiles the template into efficient change-detection code, then keeps the DOM in sync with your reactive state (signals today, RxJS observables where you need them)." />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="One-way data flow by default">
+      <ui-text-block text="Data flows down from parent to child through inputs (input()). When a component's own state changes, Angular re-evaluates just that component's template (and any child inputs that depend on it) under its OnPush strategy. Two-way binding exists but is opt-in via model() — explicit, predictable, never magic." />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Framework, not library">
+      <ui-text-block text="Unlike React (view-layer only), Angular ships the whole toolbox: DI, router, forms, HttpClient, and a compiler. The trade-off is more to learn up front; the payoff is one settled, idiomatic answer to almost every cross-cutting concern. This very app leans on Angular's native DI, the Angular Router, and HttpClient — each covered on its own screen." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. Components & templates -->
+  <ui-section-wrapper title="Components & templates">
+    <ui-content-group-wrapper title="A component is a class + a template">
+      <ui-text-block text="Every component is a standalone @Component class. Its selector is the custom element other templates use; its template is the HTML rendered when that element appears. Bindings tie the class to the template: the mustache syntax interpolates text, [prop]='expr' sets an input/property, (event)='handler()' binds an output." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.component"
+        caption="A standalone component. No NgModule needed — imports live right on the class."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Inputs are read-only signals">
+      <ui-text-block text="input() declares a reactive input. The parent sets it with [name]='…'; inside the class it reads as a signal — call name() to read. required inputs throw if omitted; optional inputs take a default. A component must never write to its own inputs — they are owned by the parent. Mutating needs state (next section)." />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: inputs drive the output">
+      <ui-text-block text="Two ProfileCards, same class, different inputs. Change the data at the call site and OnPush change detection updates only what changed." />
+      <ui-example label="Inputs drive the output">
+        <app-profile-card-host />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. Signals -->
+  <ui-section-wrapper title="Signals">
+    <ui-content-group-wrapper title="signal(), computed(), effect()">
+      <ui-text-block text="A signal is a reactive cell: signal(initial) returns a getter/setter pair. computed(() => …) derives a value that re-runs only when its sources change. effect(() => …) runs a side effect whenever the signals it reads change. Together they replace manual subscription management for local state and are the foundation of OnPush change detection in modern Angular." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.signals"
+        caption="Read a signal by calling it: count(). Update with .set, .update, or .mutate (for mutable values)."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: a working counter">
+      <ui-text-block text="Each click calls the signal's setter; Angular re-renders this component only. The reset button uses .set — functional updates via .update are safest when the next value depends on the previous." />
+      <ui-example label="A working counter">
+        <app-counter-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="State is private and independent">
+      <ui-text-block text="Two instances of the same component each own their own signals. Sharing state across the tree is the job of a service + DI (a shared signal in an injectable) or a state library — covered in the State management screens." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. Two-way binding -->
+  <ui-section-wrapper title="Two-way binding (model())">
+    <ui-content-group-wrapper title="Banana in a box: [(…)]">
+      <ui-text-block text="Two-way binding is sugar over an input + an output of the same name with a Change suffix. The signal-API version is model(): it declares both at once. The parent binds [(message)]='state'; the child writes via .set and the parent signal updates automatically." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.twoWay"
+        caption="model() = input() + output(). [(ngModel)] from @angular/forms works the same way under the hood."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: parent ↔ child">
+      <ui-text-block text="Type in either input — both update. The parent owns the signal; the child writes to it through its model() binding." />
+      <ui-example label="Two-way binding">
+        <app-two-way-host />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. Directives -->
+  <ui-section-wrapper title="Directives">
+    <ui-content-group-wrapper title="Structural directives: @if / @for / @switch">
+      <ui-text-block text="Structural directives add, remove, or repeat elements. Modern Angular ships built-in control flow in the template compiler — @if / @else, @for (with track and @empty), @switch / @case — no import needed, better type-checking, and faster change detection than the legacy *ngIf / *ngFor / *ngSwitch." />
+      <ui-code-block language="html" [code]="snippets.structural" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Attribute directives: change an element">
+      <ui-text-block text="Attribute directives change the appearance or behaviour of an existing element instead of adding/removing it. They're classes annotated with @Directive and a CSS selector. Below, appHighlight turns the chip into a hover target — its source is shown beneath the live demo." />
+      <ui-example label="Custom attribute directive (hover me)">
+        <span appHighlight="var(--color-secondary-container)">
+          Hover over this chip to see HighlightDirective apply a background.
+        </span>
+      </ui-example>
+      <ui-code-block
+        language="ts"
+        [code]="snippets.attribute"
+        caption="@HostListener wires DOM events; @HostBinding binds a host property. The directive source lives in highlight.directive.ts."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: @if / @for / @switch together">
+      <ui-text-block text="One demo exercising all three control-flow forms: a toggle (@if/@else), a severity picker (@for over a literal union + @switch), and an add/remove list (@for with a stable track key + @empty)." />
+      <ui-example label="Structural control flow">
+        <app-structural-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Pipes -->
+  <ui-section-wrapper title="Pipes">
+    <ui-content-group-wrapper title="Built-in pipes">
+      <ui-text-block text="Pipes transform a template value inline through the pipe operator (value | pipe:arg). Angular ships common ones — date, number, decimal, percent, currency, uppercase, json, async (for observables). They are pure by default (re-run only when the input or args change), so they are cheap in lists." />
+      <div class="pipe-grid">
+        <div class="pipe-row">
+          <code class="src">{{ now | date: 'medium' }}</code>
+          <span class="via">| date:'medium'</span>
+        </div>
+        <div class="pipe-row">
+          <code class="src">{{ pi | number: '1.2-4' }}</code>
+          <span class="via">| number:'1.2-4'</span>
+        </div>
+        <div class="pipe-row">
+          <code class="src">{{ 0.42 | number: '1.0-0' : 'en-US' }}</code>
+          <span class="via">| number (percent-like)</span>
+        </div>
+        <div class="pipe-row">
+          <code class="src">{{ 'angular' | uppercase }}</code>
+          <span class="via">| uppercase</span>
+        </div>
+      </div>
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Custom pipe">
+      <ui-text-block text="A pipe is a class with @Pipe and a transform method. Below, TruncatePipe shortens long strings — exactly what you'd use for preview text in a list. Its source is the file shown beneath." />
+      <div class="pipe-grid">
+        <div class="pipe-row">
+          <code class="src">{{ longText | truncate: 40 : '…' }}</code>
+          <span class="via">truncate:40:'…'</span>
+        </div>
+      </div>
+      <ui-code-block
+        language="ts"
+        [code]="snippets.pipe"
+        caption="Source: truncate.pipe.ts. Pure pipes default — set pure:false only if you must."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Modules vs standalone -->
+  <ui-section-wrapper title="Modules vs standalone">
+    <ui-content-group-wrapper title="Standalone is the modern default">
+      <ui-text-block text="Before Angular 14, every component belonged to an NgModule that declared its compilation context (declarations) and imports. Standalone components drop that: their dependencies are listed on @Component.imports directly, and they're lazy-loaded with loadComponent without a wrapper module. This whole app uses standalone exclusively — there are zero NgModules in src/." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.standalone"
+        caption="A lazy route in app.routes.ts — loadComponent takes a standalone, no module required."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="When you'd still reach for a module">
+      <ui-text-block text="Almost never in new code. The remaining uses are legacy: apps not yet migrated, or sharing a large set of declarations via forRoot-style configuration. For everything else — including routing, HttpClient, forms, and DI — standalone + provider functions replace modules." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. Content projection -->
+  <ui-section-wrapper title="Content projection (ng-content)">
+    <ui-content-group-wrapper title="Angular's composition primitive">
+      <ui-text-block text="Whatever a parent nests between a component's tags is projected into that component's template via <ng-content />. Use select to target a specific node (by attribute, element, or class) into a named slot; a slot-less <ng-content /> catches the rest. This is how every wrapper primitive in this app (SectionWrapper, Example, ContentGroupWrapper) is built." />
+      <ui-code-block language="html" [code]="snippets.projection" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: projected card">
+      <ui-text-block text="The parent passes a title (via [card-title]), body content (default slot), and an action (via [card-actions]). The card decides where each lands." />
+      <ui-example label="Content projection with select">
+        <app-projection-host />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 9. Dynamic components -->
+  <ui-section-wrapper title="Dynamic components">
+    <ui-content-group-wrapper title="ViewContainerRef.createComponent">
+      <ui-text-block text="When a component isn't known at author time (toasts, dialogs, lazily-rendered widgets), build it imperatively. Grab a ViewContainerRef at an anchor, call createComponent(ComponentType), setInput on the returned ComponentRef, and destroy() when done. No *ngComponentOutlet or entryComponent ceremony — just a container and a class." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.dynamic"
+        caption="AlertBox is created without ever appearing in a template binding."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: spawn dynamic alerts">
+      <ui-text-block text="Each click constructs an AlertBox, sets its message input, and appends it to the anchor below. Clear tears them down via ComponentRef.destroy()." />
+      <ui-example label="Imperative component creation">
+        <app-dynamic-components-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 10. Where next -->
+  <ui-section-wrapper title="Where these fundamentals go next">
+    <ui-text-block text="The building blocks above are enough to read most Angular code. The following screens take each advanced topic deeper — they're all composed from exactly the primitives covered here." />
+    <app-where-next-chips />
+  </ui-section-wrapper>
+</div>

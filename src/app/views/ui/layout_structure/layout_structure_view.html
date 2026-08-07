@@ -1,0 +1,154 @@
+<div class="page">
+  <!-- 1. From component tree to DOM -->
+  <ui-section-wrapper title="Pages are component trees">
+    <ui-content-group-wrapper title="Compose, don't concatenate">
+      <ui-text-block text="An Angular page is a tree of nested standalone components, each declaring a template. The root component (App) renders the shell; the router swaps a matched view into <router-outlet>; that view composes its own children. Angular compiles each template into efficient change-detection code and turns the tree into real DOM nodes the browser lays out. There is no per-screen scaffold boilerplate — the shell is declared once and reused by every route." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.tree"
+        caption="The whole app is one tree. Each node is a component; the leaves are DOM elements."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: a page from three components">
+      <ui-text-block text="The host below composes a nav, a content article, and an aside into a small page layout. Each child is its own standalone component — that composition is how every Angular screen (including this one) is built." />
+      <ui-example label="Composing components into a layout">
+        <app-composition-demo />
+      </ui-example>
+      <ui-code-block
+        language="ts"
+        [code]="snippets.primitives"
+        caption="The same idea at scale: shared wrappers compose into whole screens."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. The app's layout pattern (shell + router-outlet) -->
+  <ui-section-wrapper title="The app shell: header + <router-outlet/>">
+    <ui-content-group-wrapper title="Declare chrome once">
+      <ui-text-block text="Angular's idiomatic layout pattern: one root component (App) renders the shared shell — a sticky header with back arrow, page title, About link, mobile drawer toggle, and theme toggle — and a <main> containing <router-outlet>. The router-outlet is the slot where the matched lazy route renders. App chrome lives in a single file instead of being repeated on every screen, and the browser already gives you back/forward and scrolling, so there's no per-screen scaffold." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.shell"
+        caption="src/app/app.ts + app.html — the shell. pathname() drives the back arrow; drawerOpen() drives the mobile drawer."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Routes are lazy-loaded">
+      <ui-text-block text="The route table maps a URL to a loadComponent dynamic import, so the initial bundle ships only the shell + the landing view — every other screen (including this one) loads on first navigation. Each route carries a title consumed by the router's TitleStrategy so the header label and document title stay in sync." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.routes"
+        caption="app.routes.ts — one entry per screen, all lazy. Unknown routes redirect home."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. Semantic HTML + landmark roles -->
+  <ui-section-wrapper title="Semantic HTML & landmark roles">
+    <ui-content-group-wrapper title="Use elements for what they mean">
+      <ui-text-block text="Reach for the element that describes the content's role, not a bare <div> for everything. Semantic tags improve accessibility (screen readers, landmark navigation), SEO, and readability for free. Use class names for visual styling on top of the meaning — never as a substitute for it. The app shell above uses <header>, <main>, <nav>, and <button> for exactly this reason." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.semantic"
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Landmarks come free">
+      <ui-text-block text="Semantic elements expose implicit landmark roles, which give assistive tech a jump target and let users skip straight to the page's content. Keep one <main> per page. Prefer the native element over an explicit role attribute — the role is redundant when the element already provides it. Reach for role explicitly only when you can't use the native element (for example a styled <div> acting as a button)." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.landmarks"
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. Structural directives for layout -->
+  <ui-section-wrapper title="Structural directives for layout (@for / @if)">
+    <ui-content-group-wrapper title="Repeat and conditionally render elements">
+      <ui-text-block text="Angular's built-in control flow is part of the template compiler — @if / @else, @for (with track and @empty), @switch. No import is needed and change detection is faster than the legacy *ngIf / *ngFor. For layout, @for is the standard way to render a list of boxes (a nav grid, a stack of cards, table rows), and track gives Angular a stable identity per item — the equivalent of React's key — so it can move DOM nodes instead of recreating them when the list changes." />
+      <ui-code-block language="html" [code]="snippets.structural" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: @for with track">
+      <ui-text-block text="Add and remove tiles — @for re-flows the list and track t.id keeps the surviving DOM nodes stable. @empty renders fallback content when the list is empty." />
+      <ui-example label="@for … track over a list of tiles">
+        <app-structural-layout-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. The box model -->
+  <ui-section-wrapper title="The box model">
+    <ui-content-group-wrapper title="Every element is a box">
+      <ui-text-block text="A block element is a rectangle of four concentric layers: content → padding → border → margin. Padding is space inside the border (part of the element's own background); margin is space outside (pushes neighbours, can collapse). width/height by default set the content box only — box-sizing: border-box (set globally in this app's reset) makes them include padding + border, which is far more intuitive and is what every width in this codebase assumes." />
+      <ui-code-block
+        language="css"
+        [code]="snippets.box"
+        caption="border-box is the sane default; this app sets it on everything via the global reset."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: padding vs margin">
+      <ui-text-block text="The outer layer (orange) is margin — transparent space pushing against the container. The middle layer (teal) is padding — space inside the element that fills with its background. The inner box (surface) is the content. Toggle to see the two layers appear and disappear." />
+      <ui-example label="Padding vs margin">
+        <app-box-model-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Flexbox -->
+  <ui-section-wrapper title="Flexbox — one-dimensional layout">
+    <ui-content-group-wrapper title="Lay items in a row or column">
+      <ui-text-block text="Flexbox arranges items along a single axis — a row or a column. Set display: flex on the container and control direction, spacing, and alignment from there. It's the workhorse for nav bars, button rows, centering, and the overwhelming majority of layout in this app. gap gives space between items without margin-collapse headaches; align-items controls the cross axis and justify-content controls the main axis." />
+      <ui-code-block
+        language="css"
+        [code]="snippets.flex"
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: direction & alignment">
+      <ui-text-block text="Flip the main axis and watch the row become a column; switch justify-content to move the same three tiles along the main axis. Only the container's flex properties change — the children are identical." />
+      <ui-example label="Direction & alignment">
+        <app-flex-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. CSS Grid -->
+  <ui-section-wrapper title="CSS Grid — two-dimensional layout">
+    <ui-content-group-wrapper title="Rows and columns together">
+      <ui-text-block text="Grid is for true two-dimensional layouts — when you need to control both rows and columns at once (dashboards, galleries, the home navigation grid). Define tracks with grid-template-columns. The responsive auto-fit pattern below is how the home card grid reflows from 1 → 2 → 3 columns with no media queries (covered in depth on the Responsive screen)." />
+      <ui-code-block
+        language="css"
+        [code]="snippets.grid"
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: column count">
+      <ui-text-block text="Same six tiles, different grid-template-columns. This is exactly how the home navigation grid is built." />
+      <ui-example label="Column count">
+        <app-grid-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. This app's layout primitives -->
+  <ui-section-wrapper title="Layout primitives in this app">
+    <ui-content-group-wrapper title="Compose with the shared wrappers">
+      <ui-text-block text="Rather than re-styling boxes per screen, this app funnels layout into a few reusable primitives. SectionWrapper is a titled, surface-tinted block; ContentGroupWrapper is a labelled sub-grouping inside it; TextBlock, CodeBlock, and Example fill in body copy, listings, and live demos. They encode the consistent spacing, surface tint, and heading scale used everywhere — so a new screen is mostly composition, not CSS. Rule of thumb: if a box is used in one file, make it a local helper in that folder; if it's used across files, it belongs in src/ui/components." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.primitives"
+        caption="The composition every screen on this site follows."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: rendered with the shared primitives">
+      <ui-text-block text="The block below is not custom CSS — it's the exact SectionWrapper + ContentGroupWrapper + TextBlock composition used across the app, rendered live." />
+      <ui-example label="SectionWrapper + ContentGroupWrapper + TextBlock">
+        <app-primitives-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

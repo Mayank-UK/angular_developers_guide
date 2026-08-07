@@ -1,0 +1,29 @@
+// This attaches to the same container that is running the angular application
+// instead of creating a new container.
+
+{
+    "name": "Angular Developers Guide",
+
+    // Use existing Compose setup instead of creating its own container
+    "dockerComposeFile": "../.docker/docker-compose.dev.yml",
+    "service": "app",
+
+    "workspaceFolder": "/app",
+
+    "forwardPorts": [4200],
+
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "angular.ng-template",
+                "esbenp.prettier-vscode",
+                "dbaeumer.vscode-eslint",
+                "ms-vscode.vscode-typescript-next"
+            ],
+            "settings": {
+                "editor.formatOnSave": true,
+                "editor.defaultFormatter": "esbenp.prettier-vscode"
+            }
+        }
+    }
+}

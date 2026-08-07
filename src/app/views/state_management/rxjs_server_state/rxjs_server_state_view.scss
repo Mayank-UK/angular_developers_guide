@@ -1,0 +1,29 @@
+:host {
+  display: block;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* Constrain the full-screen ShowError primitive so it doesn't take over the
+ * page inside the error-handling example. Mirrors the design-system screen's
+ * approach to rendering ShowError in a gallery frame. */
+.err-frame {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--color-outline);
+  border-radius: var(--radius-md);
+}
+
+.retry-out {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--text-caption);
+  color: var(--color-on-surface-variant);
+}
+.retry-out strong {
+  color: var(--color-on-surface);
+  font-family: var(--font-mono);
+}

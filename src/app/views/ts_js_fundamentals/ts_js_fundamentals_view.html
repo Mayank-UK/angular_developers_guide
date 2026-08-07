@@ -1,0 +1,229 @@
+<div class="page">
+  <!-- 1. Intro -->
+  <ui-section-wrapper title="JavaScript vs TypeScript">
+    <ui-content-group-wrapper title="JavaScript runs in the browser (and on servers)">
+      <ui-text-block text="JavaScript is a dynamically-typed, garbage-collected language with prototypal inheritance and a single-threaded, event-loop-based concurrency model. This app's runtime is the browser; the same language also runs on servers via Node.js. There is one number type (IEEE-754 double), no separate int/float, and typeof x tells you a value's category at runtime." />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="TypeScript is JavaScript + static types (TS)">
+      <ui-text-block text="TypeScript is a strict superset of JavaScript: any valid JS is valid TS. It adds a type system that is erased at compile time — the output is plain JS, so types cost nothing at runtime. They catch whole classes of bugs at edit time (typos in property names, wrong argument shapes, null dereferences) and power the editor autocomplete you see throughout this codebase. Every .ts file in this app is TypeScript." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. Variables -->
+  <ui-section-wrapper title="Variables: let, const, var">
+    <ui-content-group-wrapper title="Prefer const, use let, avoid var">
+      <ui-text-block text="const declares a binding that can't be reassigned (though objects it holds can still mutate). let declares a reassignable, block-scoped variable. var is the old, function-scoped, hoisted form — avoid it in modern code; it is the source of confusing hoisting bugs." />
+      <ui-code-block language="ts" [code]="snippets.variables" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Hoisting & the temporal dead zone">
+      <ui-text-block text="let/const are hoisted but stay uninitialized until their line runs (the temporal dead zone) — using them early throws. var hoists and initializes to undefined, so it silently returns undefined instead. This is the main reason var is avoided." />
+      <ui-code-block language="ts" [code]="snippets.tdz" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: const binding, mutable state, inferred number">
+      <ui-text-block text="count is a signal holding a number; doubled is a computed that derives from it. The click handlers only ever feed numbers in, so doubled can never go NaN — exactly the class of bug static types prevent at edit time." />
+      <ui-example label="Variables + inference">
+        <app-variables-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. Primitive types -->
+  <ui-section-wrapper title="Primitive & reference data types">
+    <ui-content-group-wrapper title="Seven primitives + reference types">
+      <ui-text-block text="Everything that isn't an object is a primitive: string, number, boolean, null, undefined, bigint, and symbol. They are immutable and compared by value. Objects (including arrays and functions) are reference types — compared by identity, so two empty objects are never === equal." />
+      <ui-code-block language="ts" [code]="snippets.primitives" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="== vs === (always use ===)">
+      <ui-text-block text="== does loose comparison with type coercion (surprising results); === compares without coercion. Standard practice — and the rule this codebase's linter enforces — is to always use === and !==." />
+      <ui-code-block language="ts" [code]="snippets.equality" />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. Type annotations, inference, unions, intersections -->
+  <ui-section-wrapper title="Type annotations, inference & type composition (TS)">
+    <ui-content-group-wrapper title="Annotate boundaries, let inference do the rest">
+      <ui-text-block text="TypeScript infers the type of most expressions automatically, so you don't annotate everything. Annotate where it adds value: function parameters and return types (public contract), and variables initialized from ambiguous values. Elsewhere, trust the inferred type." />
+      <ui-code-block language="ts" [code]="snippets.annotations" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Union types & literals">
+      <ui-text-block text="A value can be one of several types with a union (|). Literal types narrow a value to specific strings/numbers — the basis of discriminated unions and exhaustive switches. TS narrows the type per case inside switch." />
+      <ui-code-block language="ts" [code]="snippets.unions" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Intersection types (composition)">
+      <ui-text-block text="An intersection (&) combines multiple types into one — the value must satisfy ALL of them. It is the type-level equivalent of mixins/composition, and the standard way to combine capabilities. interface uses extends for the same idea." />
+      <ui-code-block language="ts" [code]="snippets.intersections" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: edit a typed object">
+      <ui-text-block text="The form below binds to a Person — id (readonly), name, role, and an optional city. Editing a field writes a new object via spread + override; the optional field uses ?? to fall back to a placeholder when absent." />
+      <ui-example label="Objects + optional + spread">
+        <app-typed-object-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. Objects, arrays, tuples -->
+  <ui-section-wrapper title="Objects, arrays & tuples">
+    <ui-content-group-wrapper title="Object shapes">
+      <ui-text-block text="An object's shape is its set of keys+value types. In TS you describe it with a type alias or interface; optional properties get a ? and readonly fields can't be reassigned." />
+      <ui-code-block language="ts" [code]="snippets.objects" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Arrays & tuples">
+      <ui-text-block text="Arrays are typed with Type[] (or Array<Type>). A tuple is a fixed-length array where each position has a known type — handy for pairs and function returns." />
+      <ui-code-block language="ts" [code]="snippets.arraysTuples" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="interface vs type">
+      <ui-text-block text="Both describe an object shape and are largely interchangeable. Convention: use interface for extensible object contracts (it can be implemented and declaration-merged), type for unions and computed/mapped shapes. The domain models in this app use plain type aliases and interfaces for DTOs." />
+      <ui-code-block language="ts" [code]="snippets.interfaceVsType" />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Functions & arrow functions -->
+  <ui-section-wrapper title="Functions & arrow functions">
+    <ui-content-group-wrapper title="Three ways to define one">
+      <ui-text-block text="Function declarations, function expressions, and arrow functions. Declarations are hoisted (callable before their line); arrows are not but are concise and don't bind their own this — which matters inside class methods that pass callbacks around." />
+      <ui-code-block language="ts" [code]="snippets.functions" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Arrow functions & lexical this">
+      <ui-text-block text="An arrow function inherits this from the enclosing scope instead of binding its own. That makes callbacks inside class methods behave correctly without manual .bind(this) — the main reason arrows are preferred for short callbacks in modern code." />
+      <ui-code-block language="ts" [code]="snippets.arrowThis" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Default, optional & rest params">
+      <ui-text-block text="Optional params (with ?) must come after required ones. Defaults are written inline with =. Rest params (...) collect trailing arguments into an array." />
+      <ui-code-block language="ts" [code]="snippets.params" />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Control flow & loops -->
+  <ui-section-wrapper title="Control flow & loops">
+    <ui-content-group-wrapper title="if / else if / else & switch">
+      <ui-text-block text="Standard branching. switch is most useful over unions (TS narrows the value per case). Remember break — without it, execution falls through to the next case." />
+      <ui-code-block language="ts" [code]="snippets.controlFlow" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="for...of, for...in & the functional array methods">
+      <ui-text-block text="for...of iterates values (arrays, strings); for...in iterates keys (avoid for arrays — order/prototype noise). The functional methods (map / filter / reduce / forEach) are the idiomatic way to transform collections and are used heavily across this app." />
+      <ui-code-block language="ts" [code]="snippets.loops" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: filter + sort with arrow functions">
+      <ui-text-block text="Type in the box: a computed re-runs the pipeline (filter + sort) on every keystroke and the list re-renders via @for with a stable track key. Each step is an arrow function." />
+      <ui-example label="Array methods + arrow functions">
+        <app-array-methods-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. Operators: spread/rest, destructuring, nullish -->
+  <ui-section-wrapper title="Spread / rest, destructuring & null-safe operators">
+    <ui-content-group-wrapper title="Spread & rest (...)">
+      <ui-text-block text="... spreads iterables (arrays) into elements or collects them back (the rest pattern). Object spread copies + overrides selected fields. All spreads are shallow — nested references are shared, not duplicated." />
+      <ui-code-block language="ts" [code]="snippets.spread" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Destructuring">
+      <ui-text-block text="Destructuring pulls values out of arrays/objects by position or name — with rename and default support. It is the standard way to read props and function arguments." />
+      <ui-code-block language="ts" [code]="snippets.destructuring" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Nullish coalescing & optional chaining">
+      <ui-text-block text="?? returns the right side only for null/undefined (use it, not ||, when 0 or '' are valid). ?. short-circuits on null/undefined instead of throwing — essential for deep property access." />
+      <ui-code-block language="ts" [code]="snippets.nullish" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: spread + override">
+      <ui-text-block text="Toggle between the base object and a spread-derived copy that overrides two fields and appends a tag. The derived panel is recomputed reactively from a computed signal." />
+      <ui-example label="Object spread + override">
+        <app-spread-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 9. Classes -->
+  <ui-section-wrapper title="Classes (TS)">
+    <ui-content-group-wrapper title="Fields, constructors & access modifiers">
+      <ui-text-block text="JS has class syntax with a prototypal backbone. TS adds access modifiers (public / private / protected) and parameter properties — constructor params that auto-declare and assign fields. In Angular, components are classes too, but plain domain/model classes (like Account below) are where classic OOP shapes show up." />
+      <ui-code-block language="ts" [code]="snippets.classes" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: an Account class with deposit / withdraw">
+      <ui-text-block text="The buttons call methods on an Account instance. The private balance is read only through its getter, and invalid input (non-positive amounts, overdraft) throws an Error that the UI catches and surfaces — a try/catch around thrown exceptions, live." />
+      <ui-example label="Class instance + exception handling">
+        <app-account-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 10. Generics -->
+  <ui-section-wrapper title="Generics (TS)">
+    <ui-content-group-wrapper title="Type-level parameters">
+      <ui-text-block text="Generics let you write code that preserves types instead of erasing them to any. A function <T>(x: T) means of whatever type the caller passes — the same definition works for number, string, etc. while keeping full type safety. This app's Result<T, E> and repository interfaces use them heavily." />
+      <ui-code-block language="ts" [code]="snippets.generics" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: a Stack<T>">
+      <ui-text-block text="Push and pop on a Stack<number>. Because the class is generic, pop is statically typed to return number | undefined — never any. The size and top-of-stack readouts update reactively." />
+      <ui-example label="Generic Stack<T>">
+        <app-generics-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 11. Async -->
+  <ui-section-wrapper title="Async: promises & async/await">
+    <ui-content-group-wrapper title="Promises — value-available-later">
+      <ui-text-block text="JS is single-threaded with an event loop, so long work (network, timers) is async. A Promise is a value-available-later object with .then / .catch / .finally. It settles once: pending -> fulfilled or pending -> rejected." />
+      <ui-code-block language="ts" [code]="snippets.promises" />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="async/await & Promise.all">
+      <ui-text-block text="async/await is syntactic sugar over promises that lets you write async code that reads top-to-bottom. await is sequential; run independent tasks in parallel with Promise.all and await the bundle." />
+      <ui-code-block language="ts" [code]="snippets.asyncAwait" caption="The API-handling screen uses exactly this shape with HttpClient." />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: simulated async with status states">
+      <ui-text-block text="The button kicks off a fake async task (a Promise resolved by setTimeout) and tracks its lifecycle through a Status literal union — idle, pending, success, error — rendered via @switch. About 70% of runs resolve; the rest reject to show the error path." />
+      <ui-example label="async/await + status union">
+        <app-async-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 12. Modules -->
+  <ui-section-wrapper title="Modules">
+    <ui-content-group-wrapper title="ES modules — import / export">
+      <ui-text-block text="Each file is a module with its own scope. Export with export (or export default for one-per-file), import with import. This app uses ESM throughout — it is the standard for browser + bundler ecosystems and the only style modern tooling expects. type-only imports (import type) are erased at build, so they cost zero at runtime." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.modules"
+        caption="import type { Vec } — the type is erased; only runtime values ship."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 13. Exceptions -->
+  <ui-section-wrapper title="Exceptions">
+    <ui-content-group-wrapper title="throw / try / catch / finally">
+      <ui-text-block text="JS lets you throw anything, but throwing Error subclasses is the convention. try/catch/finally handles failures; async rejections land in catch when awaited. In TS, the caught value is unknown — narrow it before use. This app goes further: it maps thrown errors into typed Failure objects with severity (see the Exception-handling screen)." />
+      <ui-code-block language="ts" [code]="snippets.exceptions" />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 14. Utility types -->
+  <ui-section-wrapper title="Utility & built-in types (TS)">
+    <ui-content-group-wrapper title="Derive new types from existing ones">
+      <ui-text-block text="TS ships helpers that transform types so you don't hand-write near-duplicates. The data layer in this app uses Pick / Omit to derive a DTO from a domain model, Partial for update shapes, and Record for keyed maps. The built-in any / unknown / void / never are the four you'll see most often in signatures." />
+      <ui-code-block language="ts" [code]="snippets.utilityTypes" />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

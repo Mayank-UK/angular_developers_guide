@@ -1,0 +1,267 @@
+<div class="page">
+  <!-- 0. What architecture is, and why -->
+  <ui-section-wrapper
+    title="Architecture — how this app's code is organised to stay maintainable"
+  >
+    <ui-content-group-wrapper
+      title="Separating things that change for different reasons"
+    >
+      <ui-text-block text="Architecture is not about folders for their own sake — it is a rule about which code is allowed to know about which other code. As a feature grows, different parts change at different speeds and for different reasons: the endpoint URL changes when the backend moves, the loading spinner changes when the designer restyles, the caching rule changes when the product adds offline mode. If all of that lives in one place, every change touches everything and every change risks breaking everything. Separating those concerns into layers means a change in one layer has no reason to touch the others — and a bug introduced in one layer cannot silently travel into another, because the dependency direction forbids the import." />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper title="The cost of not doing it">
+      <ui-text-block text="The alternative — fetch-and-setState inline in the component — works for a demo and then rots. The component ends up knowing the endpoint shape, the DTO-to-model mapping, the cache strategy, the error wording, and the spinner state all at once. You cannot test the fetch without rendering the component, cannot swap the real API for a fake without editing the component, and cannot reuse the logic in a second screen without copying it. Every one of those pains is a layer boundary that was never drawn. This app's four layers — domain, data, core, ui — are those boundaries, and Angular's native DI is the single seam that lets the outer ui layer reach data without a hard dependency on it." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 1. The four layers + the CENTERPIECE diagram -->
+  <ui-section-wrapper title="The four layers in this app">
+    <ui-content-group-wrapper
+      title="Each layer owns one concern and may not reach across"
+    >
+      <ui-text-block text="The codebase splits into four layers. Read this table as a contract: the 'may not touch' column is enforced by import discipline (and would be enforced by a tool like dependency-cruiser in a larger app). Every file in src/ belongs to exactly one of these. The layered diagram below is the visual form of that contract — every arrow points inward, toward the domain." />
+      <ui-code-block
+        language="text"
+        [code]="snippets.layerMap"
+        [defaultOpen]="true"
+        caption="The four layers and what each one owns."
+      />
+      <ui-code-block
+        language="text"
+        [code]="snippets.layerOneLiners"
+        [defaultOpen]="true"
+        caption="One line per layer."
+      />
+    </ui-content-group-wrapper>
+
+    <!-- CENTERPIECE: styled layered diagram -->
+    <ui-content-group-wrapper
+      title="The layered architecture — dependencies point inward"
+    >
+      <ui-text-block text="The centerpiece of this screen. The domain sits innermost — pure business rules, no framework. Each ring outwards may depend on the rings inside it, never the reverse. The single escape hatch is the DI seam: ui/ reaches data/ only through the InjectionTokens in core/di, never by importing a concrete repository, DTO, or HttpClient. Hover/tap a ring to see its responsibility." />
+      <div class="diagram" role="img" aria-label="Layered architecture diagram">
+        <div class="ring ring--ui">
+          <span class="ring-tag">ui/ + app/</span>
+          <span class="ring-sub">views, components, design system</span>
+          <div class="ring ring--data">
+            <span class="ring-tag">data/</span>
+            <span class="ring-sub">remote · local · repositories · fake</span>
+            <div class="ring ring--core">
+              <span class="ring-tag">core/</span>
+              <span class="ring-sub">result · errors · config · di tokens</span>
+              <div class="ring ring--domain">
+                <span class="ring-tag">domain/</span>
+                <span class="ring-sub">models · contracts · use cases</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="arrows">
+          <span class="arrow">← dependencies point inward</span>
+          <span class="arrow arrow--seam"
+            >ui → data : only via core/di tokens (inject)</span
+          >
+        </div>
+      </div>
+      <ui-code-block
+        language="text"
+        [code]="snippets.depRuleAscii"
+        [defaultOpen]="false"
+        caption="The same diagram as ASCII (the dependency rule at a glance)."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. The dependency rule -->
+  <ui-section-wrapper title="The dependency rule — every arrow points inward">
+    <ui-content-group-wrapper
+      title="Domain is framework-free; data implements domain; ui talks to use cases"
+    >
+      <ui-text-block text="The single rule that makes the layers work: dependencies point inward, toward the domain. The domain layer has no imports of Angular, HttpClient, Dexie, or anything browser-specific — it is plain TypeScript types and pure classes, so it could run in Node, in a worker, or in tests with zero setup. The data layer implements the domain's contracts (PostRepositoryImpl satisfies the PostRepository interface the domain defines) and is the only place framework imports live. The ui layer depends on domain use cases and models, never on a concrete data implementation — it asks the DI system for GET_POSTS_USE_CASE and has no idea whether that resolves to a real REST client or a fake." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.tokensExcerpt"
+        [defaultOpen]="true"
+        caption="src/core/di/tokens.ts — the DI seam (type-only domain imports)."
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="The one escape hatch: the composition root"
+    >
+      <ui-text-block text="There is exactly one place allowed to know about concrete implementations: src/data/providers.ts. It is the composition root — the file that wires PostRepositoryImpl to the real or fake sources and binds the finished GetPostsUseCase to its token so the rest of the app can inject it. This is not a violation of the rule; it is the rule's escape hatch. Every other file depends on an interface, and this one file is where interfaces meet instances. The Dependency-management screen covers it in depth; here we only note that provideData(config) is the single arrow allowed to point outward." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.providersExcerpt"
+        [defaultOpen]="true"
+        caption="src/data/providers.ts — provideData(config): the composition root."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. Folder structure is the architecture -->
+  <ui-section-wrapper title="Folder structure is the architecture">
+    <ui-content-group-wrapper title="The src/ tree, grouped by layer">
+      <ui-text-block text="Because the dependency rule is enforced by imports, the folder tree is not just organisation — it is the architecture made visible. You can read which layer a file belongs to from its path, and you can trust that a file under domain/ will never import from data/ or ui/. Here is this app's real tree, annotated. (Feature folders — app/views/<screen>/ — colocate a screen with its teaching artifacts and demo components; shared, reusable presentational pieces live under ui/components/.)" />
+      <ui-code-block
+        language="text"
+        [code]="snippets.folderTree"
+        [defaultOpen]="true"
+        caption="This app's real src/ tree, annotated by layer."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. Smart vs presentational components -->
+  <ui-section-wrapper
+    title="Smart vs presentational components — the Angular split"
+  >
+    <ui-content-group-wrapper
+      title="Containers resolve data; dumb components render inputs"
+    >
+      <ui-text-block text="Within the ui layer, components split into two roles. Smart (container) components resolve data through inject() — use cases, stores, tokens — own interaction state as signals, and pass data down. Presentational (dumb) components take signal inputs, emit events via output()/model(), and contain zero data-fetching logic. This app's shared primitives in ui/components/ (section-wrapper, code-block, example, show-error, theme-toggle) are all presentational — they are reused across every screen precisely because they depend on nothing but their inputs. The rule for where a component lives: used by more than one file → ui/components/; used by one screen → that screen's feature folder." />
+      <ui-code-block
+        language="text"
+        [code]="snippets.smartVsPresentational"
+        [defaultOpen]="true"
+        caption="Smart/container vs presentational/dumb — and the folder rule."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. The flow of one feature -->
+  <ui-section-wrapper
+    title="The flow of one feature — GetPosts, layer by layer"
+  >
+    <ui-content-group-wrapper
+      title="A request crosses every seam exactly once"
+    >
+      <ui-text-block text="Trace fetching the posts list from a button press to pixels. Each hop is a layer boundary, and each boundary has a reason: the UI stays free of fetching details, the use case stays free of storage strategy, the repository implementation stays free of UI state. The return path carries a Result<T> — never a thrown exception — so the UI can branch on severity without a try/catch. Every excerpt below is the REAL source in this app." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.usecaseExcerpt"
+        [defaultOpen]="true"
+        caption="src/domain/usecases/get-posts-usecase.ts — the orchestration seam."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.repoContractExcerpt"
+        [defaultOpen]="true"
+        caption="src/domain/repositories/post-repository.ts — the CONTRACT."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.repoImplExcerpt"
+        [defaultOpen]="true"
+        caption="src/data/repositories/post-repository-impl.ts — the implementation."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.remoteExcerpt"
+        [defaultOpen]="false"
+        caption="src/data/remote/post-api.service.ts — where HttpClient lives."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.dtoExcerpt"
+        [defaultOpen]="false"
+        caption="src/data/remote/post-dto.ts — DTOs never leave data/."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.resultExcerpt"
+        [defaultOpen]="true"
+        caption="src/core/result.ts — failures are values, not throws."
+      />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.flowTrace"
+        [defaultOpen]="true"
+        caption="One trace, top to bottom: ui → domain → data → core → ui."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. The error pipeline crosses layers -->
+  <ui-section-wrapper
+    title="The error pipeline crosses every layer — as values"
+  >
+    <ui-content-group-wrapper
+      title="AppException (data) → Failure (domain) → Result<T> (UI)"
+    >
+      <ui-text-block text="Errors are the spine of this app, and the pipeline is itself a layered concern: an engine error is caught in the data layer, typed as an AppException, mapped at the boundary into a domain Failure (kind + severity + user message), and returned to the UI as a Result.Failed value. The UI never imports AppException or HttpErrorResponse; it switches on Failure.severity — critical → full-screen <ui-show-error/>, warning/info → non-blocking banner. The Exception-handling screen is the deep dive; this is the map." />
+      <ui-code-block
+        language="text"
+        [code]="snippets.errorPipeline"
+        [defaultOpen]="true"
+        caption="Engine error → AppException → Failure → Result<T>."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Why it pays off -->
+  <ui-section-wrapper title="Why these boundaries pay off">
+    <ui-content-group-wrapper
+      title="Four concrete wins, each a direct consequence of the rule"
+    >
+      <ui-text-block text="Testability, swappability, parallel work, and framework isolation. Each is a property you GET from the dependency rule, not something you bolt on later. The repository is exercised against in-memory fakes with no network and no DOM; the same screen runs against the live backend in staging and a canned fake in dev selected by one config field; a team can split along the seams and merge without conflicts; and Angular, HttpClient, and Dexie each appear in exactly one layer, so swapping one touches a single file." />
+      <ui-code-block
+        language="text"
+        [code]="snippets.payoff"
+        [defaultOpen]="true"
+        caption="The four payoffs of the dependency rule."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- CENTERPIECE #1: layer explorer -->
+  <ui-section-wrapper title="Live — explore the layers">
+    <ui-content-group-wrapper title="Click a layer to read its contract">
+      <ui-text-block text="This is the dependency rule as a clickable contract. Each card is a layer; selecting it shows what that layer owns, what it may depend on, what it is forbidden from depending on, and the real files that live in it in this app. The 'may NOT depend on' line is the rule that keeps the architecture from rotting." />
+    </ui-content-group-wrapper>
+    <ui-example label="the four layers and their contracts">
+      <app-arch-layer-explorer />
+    </ui-example>
+  </ui-section-wrapper>
+
+  <!-- CENTERPIECE #2: import-rule checker -->
+  <ui-section-wrapper
+    title="Live — the import-rule checker (legal vs illegal across the seam)"
+  >
+    <ui-content-group-wrapper
+      title="Pick the layer you are editing; classify each import"
+    >
+      <ui-text-block text="The dependency rule made executable. Pick which layer the file you are editing lives in, then read each sample import's verdict. The illegal ones are the imports that would rot the architecture: a domain file pulling in @angular/core or a DTO; a view importing PostRepositoryImpl, a DAO, a DTO, or HttpClient directly; any layer importing ui/. The legal ones show the sanctioned path — domain depending only on core's pure Result/Failure, data implementing the domain contract, ui resolving data through the DI token. The classifier is a pure const-object map plus a literal union — no enum, no magic." />
+    </ui-content-group-wrapper>
+    <ui-example label="interactive import-rule checker">
+      <app-arch-import-checker />
+    </ui-example>
+  </ui-section-wrapper>
+
+  <!-- CENTERPIECE #3: request-flow tracer -->
+  <ui-section-wrapper title="Live — trace a request through the layers">
+    <ui-content-group-wrapper
+      title="Run GetPosts and watch each layer light up"
+    >
+      <ui-text-block text="This animates the GetPosts flow from the section above. Each lit step is a layer boundary the request crosses. Toggle 'inject a network failure' to see the one extra boundary that fires on the error path — the guard that converts a thrown exception into a Result, which is the whole reason exceptions never reach the UI." />
+    </ui-content-group-wrapper>
+    <ui-example label="request-flow tracer">
+      <app-arch-request-tracer />
+    </ui-example>
+  </ui-section-wrapper>
+
+  <!-- How the view consumes it -->
+  <ui-section-wrapper
+    title="How a view consumes it — inject the token, switch on Result"
+  >
+    <ui-content-group-wrapper
+      title="The view holds no concrete repo, only the use-case token"
+    >
+      <ui-text-block text="The whole point of the seam: a view resolves GET_POSTS_USE_CASE through inject() and treats it as a black box that returns Result<Post[]>. The same component runs unchanged against FakeApiService (dev), PostApiService (staging), or a test fake — the token abstracts which one, and the wiring is decided once at bootstrap from environment config. No HttpClient, no DTO, no repository-implementation import in the view. That is the dependency rule made real by DI." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.consumeExcerpt"
+        [defaultOpen]="true"
+        caption="A view: inject(GET_POSTS_USE_CASE) + a Result-driven signal."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

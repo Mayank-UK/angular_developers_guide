@@ -1,0 +1,212 @@
+<div class="page">
+  <!-- 0. The whole pipeline at a glance -->
+  <ui-section-wrapper
+    title="Exception handling — the app's two-stage error pipeline"
+  >
+    <ui-content-group-wrapper
+      title="What broke (technical) vs what to tell the user (semantic)"
+    >
+      <ui-text-block text="Most teams let raw engine errors — an HttpErrorResponse, a Dexie failure, a TypeError from fetch — travel straight to the UI, where each screen invents its own 'is this bad?' check. This app does not. It splits 'something went wrong' into two deliberately decoupled stages. AppException is the data-layer vocabulary: typed, technical, chained via .cause, and NEVER shown to users. Failure is the domain/presentation vocabulary: a small, known set of user-facing states each tagged with a severity (critical / warning / info) that mechanically decides blocking vs non-blocking presentation. The UI reasons only about Failure.kind and Failure.severity — it never inspects an HTTP status code or a Dexie error. The two stages are bridged by three pure guards in src/core/error-handling/guards.ts, and the final value that crosses into the UI is a Result<T>." />
+      <ui-code-block
+        language="text"
+        [code]="snippets.pipeline"
+        [defaultOpen]="true"
+        caption="engine error → AppException → Failure → Result → severity-driven UI. The spine of the app (ARCHITECTURE.md, 'The error pipeline')."
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="Why two stages instead of one"
+    >
+      <ui-text-block text="Because 'what broke' and 'what to show the user' are different questions with different audiences. A 404 and a 503 are the same answer to the user ('something is wrong on the server'), but they are different technical signals internally; a network outage and a cache miss are different severities but the same failure family. Decoupling lets the data layer speak precisely (NetworkException vs TimeoutException vs ServerException) while the UI speaks coarsely (NetworkFailure + critical → full-screen error). Severity is a PROPERTY of the Failure type, fixed per kind — so the moment the UI holds a Failure it already knows how urgently to surface it, with no per-screen judgement call. And because AppException and Failure both chain via .cause, a compound failure ('served stale cache because the network failed because the request timed out') reconstructs the whole story for logs." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 1. AppException — the data-layer vocabulary -->
+  <ui-section-wrapper
+    title="AppException — the data-layer vocabulary (never shown)"
+  >
+    <ui-content-group-wrapper
+      title="A small typed hierarchy, each carrying its cause"
+    >
+      <ui-text-block text="AppException is an abstract Error subclass; the concrete ones name the kinds of technical failure the data layer can hit. Each carries an optional cause — the original error — so the full chain of 'what really happened' is preserved for logs. TimeoutException extends NetworkException because a timeout is a flavour of network failure (and so maps to the same Failure). These live strictly inside src/data and src/core/error-handling; the UI never imports them. Note the cause assignment in the constructor body rather than via super options — with useDefineForClassFields, redeclaring cause as a field would otherwise reset it to undefined after super() runs." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.exceptions"
+        [defaultOpen]="true"
+        caption="src/core/error-handling/exceptions.ts — abstract AppException + 5 concrete subclasses."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. The guards — the bridge -->
+  <ui-section-wrapper title="The guards — upgrading, mapping, and wrapping">
+    <ui-content-group-wrapper
+      title="httpErrorToException — the single HttpErrorResponse → AppException map"
+    >
+      <ui-text-block text="Angular HttpClient surfaces every non-2xx and network failure as an HttpErrorResponse. httpErrorToException is the single source of truth for turning one into a typed AppException, branched on status: 0 (no response) → NetworkException; 408 → TimeoutException; 401/403 → AuthException; 5xx → ServerException (carrying the response body's message if it has one); any other status → ServerException, because the server answered (404 not-found lands here). This one function is used by BOTH guardedApiCall (at the data source) AND the retry interceptor (on exhaustion), so the data layer only ever catches typed exceptions — it never branches on HttpErrorResponse shape itself." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.httpMap"
+        [defaultOpen]="true"
+        caption="src/core/error-handling/guards.ts — httpErrorToException, the status → exception table."
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="guardedApiCall + toAppException — turn any throw into a typed exception"
+    >
+      <ui-text-block text="Data sources (PostApiService, PostDAO) wrap every call in guardedApiCall. It runs the work and, on any throw, converts the unknown value into a typed AppException via toAppException: an HttpErrorResponse goes through httpErrorToException; a TypeError (fetch's 'Failed to fetch') becomes a NetworkException; a SyntaxError (bad JSON) becomes a ServerException; an already-typed AppException passes through untouched. The repository above therefore only ever catches typed exceptions — it can branch on instanceof NetworkException, not on error.response.status." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.guardedCall"
+        [defaultOpen]="true"
+        caption="src/core/error-handling/guards.ts — guardedApiCall + toAppException."
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="mapExceptionToFailure — exception → user-facing Failure (recursive)"
+    >
+      <ui-text-block text="The second guard maps a typed AppException to its Failure, RECURSING into the cause so a chained exception becomes a chained Failure. Each exception type maps to exactly one Failure type — this is the single place that decides 'a ServerException becomes a ServerFailure (critical)', 'an AuthException becomes an AuthFailure (warning)'. The recursion is what lets a compound exception (timeout → network → cache-fallback-failed) collapse into one Failure whose .chain trace still lists every link. After this guard, the value is something the UI can switch on by kind and severity." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.mapFailure"
+        [defaultOpen]="true"
+        caption="src/core/error-handling/guards.ts — mapExceptionToFailure, recursive over the cause chain."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. Failure — the user-facing states -->
+  <ui-section-wrapper
+    title="Failure — the user-facing states the UI switches on"
+  >
+    <ui-content-group-wrapper
+      title="Each kind has a fixed severity (severity is data, not a judgement)"
+    >
+      <ui-text-block text="A Failure is an abstract class with a kind (network / server / cache / auth / database / unknown), a severity (info / warning / critical), a user-friendly message, and an optional chained cause. The concrete classes are the COMPLETE vocabulary the UI needs to know about — nothing else. Severity is not random: it is fixed per kind (NetworkFailure/ServerFailure/DatabaseFailure/UnknownFailure → critical; AuthFailure → warning; CacheFailure → warning by default, raised to critical when the cache was the last resort). Severity is a const-object + literal union (NEVER an enum) to stay compatible with Angular's erasable-only TypeScript. The joined message (cause → this) reads naturally; the chain trace lists each link for logs." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.failureModel"
+        [defaultOpen]="true"
+        caption="src/core/error-handling/failure.ts — Failure + FailureSeverity (const-object + literal union)."
+      />
+    </ui-content-group-wrapper>
+    <ui-content-group-wrapper
+      title="The exception → failure → severity map"
+    >
+      <ui-text-block text="This is the whole pipeline in one table. Read it top to bottom: the data layer throws one of the typed AppExceptions; mapExceptionToFailure turns it into exactly one Failure; that Failure's severity decides the UI treatment. The interesting row is CacheFailure — it is the offline-first escape hatch. When the remote fails and the cache has data, the repository serves the data and attaches a CacheFailure as a non-blocking warning (Success + warning). When the remote fails and the cache is empty, it is a blocking NetworkFailure. When the remote fails AND the cache read itself throws, a CacheFailure is chained on top of the upstream NetworkFailure and marked critical — the cache was the last resort and there is nothing left to show." />
+      <ui-code-block
+        language="text"
+        [code]="snippets.severityMap"
+        [defaultOpen]="true"
+        caption="thrown exception → Failure → severity → UI treatment."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. The retry interceptor -->
+  <ui-section-wrapper
+    title="The retry interceptor — never retries an AppException"
+  >
+    <ui-content-group-wrapper
+      title="Functional HttpInterceptorFn, idempotent + jittered"
+    >
+      <ui-text-block text="retry.interceptor.ts is a functional HttpInterceptorFn registered once in app.config.ts via withInterceptors([retryInterceptor]). It retries only idempotent methods (GET/HEAD/OPTIONS/PUT/DELETE) on transient failures (NetworkException / TimeoutException) with exponential full-jitter backoff — random(0, base * 2^(attempt-1)) — to avoid thundering-herd retries against a recovering server. Two invariants matter for the error pipeline. First: errors that are ALREADY typed AppExceptions (thrown upstream by an interceptor or the fake path) are never retried — they are intentional, not transient. Second: on exhaustion the error is mapped to a typed AppException via the shared httpErrorToException mapping before it leaves the interceptor, so the data layer above only ever handles one error shape. The interceptor is the canonical example of httpErrorToException being reused outside the data source." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.interceptor"
+        [defaultOpen]="true"
+        caption="src/data/remote/retry.interceptor.ts — catchError + timer + concatMap; never retries AppExceptions."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. Chaining — preserving the full story -->
+  <ui-section-wrapper title="Chaining — a compound failure is never flattened">
+    <ui-content-group-wrapper
+      title=".cause carries the whole story in one value"
+    >
+      <ui-text-block text="When one failure causes another, the second carries the first as its .cause instead of replacing it. The classic case in this app: the remote fails (network), the repository falls back to the cache, and the cache read fails too — so a CacheFailure is built on top of the upstream NetworkFailure. The joined message reads 'No internet connection + No cached data available' (the UI shows this), and Failure.chain renders a multi-line trace with a '→ caused by:' line per link (this is what gets logged). Both AppException.cause and Failure.cause chain, so the post-mortem shows every link from the user-facing Failure all the way down to the original HttpErrorResponse." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.chaining"
+        [defaultOpen]="true"
+        caption="src/core/error-handling/guards.ts — chainedCacheFailure builds the critical CacheFailure ← upstream Failure."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. CENTERPIECE 1: live pipeline through the real seam -->
+  <ui-section-wrapper
+    title="Live — drive every failure scenario through the real pipeline"
+  >
+    <ui-content-group-wrapper
+      title="inject(GET_POSTS_USE_CASE) → Result<Post[]> → severity-driven UI"
+    >
+      <ui-text-block text="This is not a mock of the pipeline — it IS the pipeline. The demo resolves GetPostsUseCase through the DI token and calls execute(); the use case calls the repository, which (in dev wiring) calls FakeApiService, which reads ScenarioService. Pick a scenario and press 'run pipeline': success yields Result.Success<Post[]>; network / timeout / server all throw typed AppExceptions that travel through guardedApiCall → mapExceptionToFailure → Result.Failed, and render via the blocking <ui-show-error/> because each maps to a critical Failure. The retry-output note shows the Failure class the pipeline produced — exactly what mapExceptionToFailure returned." />
+    </ui-content-group-wrapper>
+    <ui-example label="Real use-case seam → Result → blocking ShowError for every failure">
+      <app-exception-pipeline-demo />
+    </ui-example>
+  </ui-section-wrapper>
+
+  <!-- 7. CENTERPIECE 2: the status → exception → failure map, live -->
+  <ui-section-wrapper
+    title="Live — httpErrorToException, status code by status code"
+  >
+    <ui-content-group-wrapper
+      title="Synthesise an HttpErrorResponse, watch the real mappers run"
+    >
+      <ui-text-block text="Pick an HTTP status and the demo builds a real HttpErrorResponse, then runs it through the REAL httpErrorToException (the same function the retry interceptor and guardedApiCall call) and the REAL mapExceptionToFailure. You see the typed AppException that comes out, the user-facing Failure it maps to, and that Failure's severity and full chain. This is the single source of truth for the '404 maps to what?' question: 404 is a server answer, so it is a ServerException → ServerFailure (critical), not a NetworkFailure. 0 is the only true network branch. 408 is the timeout branch. 401/403 are the auth (warning) branch." />
+    </ui-content-group-wrapper>
+    <ui-example label="Real httpErrorToException + mapExceptionToFailure, in the browser">
+      <app-exception-mapping-demo />
+    </ui-example>
+  </ui-section-wrapper>
+
+  <!-- 8. CENTERPIECE 3: severity-driven presentation -->
+  <ui-section-wrapper
+    title="Live — severity drives blocking vs non-blocking presentation"
+  >
+    <ui-content-group-wrapper
+      title="One Failure, two treatments, chosen mechanically by severity"
+    >
+      <ui-text-block text="The UI never decides 'is this bad?' — the Failure already did, via its severity. Pick a Failure kind and the demo builds it from the REAL constructors (new NetworkFailure(...), new CacheFailure(message, cause, severity), etc.) and renders it through the same severity branch a consuming view uses: critical → full-screen blocking <ui-show-error/> with a Retry; warning/info → a non-blocking banner the screen could dismiss while still rendering its data. The chained CacheFailure rows show the offline-first escape hatch in action — the warning variant keeps the screen; the critical variant (cache was the last resort) blocks. This is exactly the decision the PipelineDemo's template makes automatically." />
+    </ui-content-group-wrapper>
+    <ui-example label="Real Failure classes → severity-driven UI (ShowError vs banner)">
+      <app-exception-severity-demo />
+    </ui-example>
+  </ui-section-wrapper>
+
+  <!-- 9. How the view consumes it -->
+  <ui-section-wrapper
+    title="How the view consumes it — a Result-driven state machine"
+  >
+    <ui-content-group-wrapper
+      title="Switch on result.ok, then on failure.severity; no transport in the view"
+    >
+      <ui-text-block text="The pipeline produces a Result; the UI turns it into loading / success / error states via a small discriminated-union signal driven straight off result.ok. The view's only data dependency is the GET_POSTS_USE_CASE DI token — it imports NEITHER HttpClient, NOR a DTO, NOR a repository impl, NOR an AppException subclass. It branches on Result (Success may carry a non-blocking warning; Failed carries the blocking Failure) and on failure.severity (critical → <ui-show-error/>; warning → banner). OnPush re-renders automatically because the signal write IS the change-detection trigger. The same shape composes with toSignal-bridged RxJS for the heavier server-state cases (see the RxJS / server-state screen)." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.consume"
+        [defaultOpen]="true"
+        caption="This screen's PipelineDemo — inject(GET_POSTS_USE_CASE) + Result-driven signal + @switch."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 10. Angular vs the React sibling -->
+  <ui-section-wrapper
+    title="Angular vs the React sibling — the error model is identical"
+  >
+    <ui-content-group-wrapper
+      title="Same types, same guards, same severity model"
+    >
+      <ui-code-block
+        language="text"
+        [code]="snippets.reactVsAngular"
+        [defaultOpen]="true"
+        caption="Two stages, .cause chaining, const-object severity, Result<T> — ported verbatim; only the engine error shape (HttpErrorResponse vs axios) differs."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>

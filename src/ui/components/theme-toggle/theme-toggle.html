@@ -1,0 +1,8 @@
+<button
+  type="button"
+  (click)="toggle()"
+  [attr.aria-label]="mode() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+  [attr.title]="mode() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+>
+  {{ mode() === 'dark' ? '☀︎' : '☾' }}
+</button>

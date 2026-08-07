@@ -1,0 +1,12 @@
+<header class="header">
+  <h1 class="title">{{ heading() }}</h1>
+  @if (intro()) {
+    <p class="intro">{{ intro() }}</p>
+  }
+</header>
+
+<section class="grid">
+  @for (item of items(); track item.route) {
+    <ui-link-card [item]="item" />
+  }
+</section>

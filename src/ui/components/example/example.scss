@@ -1,0 +1,22 @@
+:host {
+  display: block;
+}
+
+.example {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--color-outline);
+  background-color: var(--color-surface-variant);
+  padding: var(--space-md);
+}
+
+.label {
+  margin: 0;
+  font-size: var(--text-overline);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-on-surface-variant);
+}

@@ -1,0 +1,169 @@
+<div class="page">
+  <!-- 0. Scoping banner: explain how Bootstrap is loaded for THIS screen -->
+  <div class="scope-banner" role="note">
+    <span class="scope-dot">●</span>
+    <p>
+      Bootstrap's CSS is loaded for <strong>this screen only</strong>: a CDN
+      <code>&lt;link&gt;</code> is attached in <code>ngOnInit</code> and removed in
+      <code>onDestroy</code>. The rest of the app keeps using its own
+      <code>var(--…)</code> token design system. Trade-off: while this screen is
+      mounted the link is technically global, so Bootstrap's element resets
+      (button/body typography) briefly affect the whole document — the moment
+      you navigate away, the link is gone.
+    </p>
+  </div>
+
+  <!-- 1. What is Bootstrap? -->
+  <ui-section-wrapper title="What is Bootstrap?">
+    <ui-content-group-wrapper title="A batteries-included CSS framework">
+      <ui-text-block text="Bootstrap is a pre-built CSS (and optional JS) framework: it ships dozens of ready-made components (buttons, cards, navbars, modals, alerts) and a 12-column grid, all with a default look. You opt into that look by adding class names — .btn, .card, .container. The trade-off is exactly that opinion: you get a polished UI fast, but to stray from Bootstrap's look you end up fighting its CSS (overriding .btn-primary's #0d6efd, its border-radius scale, its reboot reset). This app uses its OWN token design system instead (var(--…) custom properties) — Bootstrap is shown here in isolation so the contrast is concrete." />
+      <ui-code-block
+        language="bash"
+        [code]="snippets.install"
+        caption="Install Bootstrap (CSS bundle) and load it once globally — the standard setup."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 2. Adding Bootstrap in Angular + the scoping trade-off -->
+  <ui-section-wrapper title="Adding Bootstrap to an Angular app">
+    <ui-content-group-wrapper title="Three ways, three blast radii">
+      <ui-text-block text="There are three places to load Bootstrap's CSS, and they differ in how much of the app they affect. (1) Globally via angular.json 'styles' — the common case; Bootstrap is available everywhere and its reboot reset applies site-wide. (2) Globally via a CDN link in index.html — same effect, no npm install. (3) Scoped to a single route by attaching the CDN link in the component's ngOnInit and removing it in onDestroy — what THIS screen does. The scoped approach is unusual for a real app (you'd normally just commit to Bootstrap globally) but it is the correct way to teach Bootstrap without forcing it on the rest of this app's token-based UI." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.threeWays"
+        caption="Global via angular.json, global via CDN, or scoped via a link this component owns."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Clean-up is non-negotiable">
+      <ui-text-block text="If you attach a global resource (a CDN link, a window listener, a timer), you MUST remove it when the component is destroyed — otherwise it leaks onto every other route. Angular's DestroyRef.onDestroy callback is the modern hook (no ngOnDestroy boilerplate), and it runs for both routed and inline components. This view holds the created <link> element on the instance and removes it in the DestroyRef callback, so navigating away from /ui/styling/bootstrap detaches Bootstrap's CSS from <head> immediately." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 3. The 12-column grid -->
+  <ui-section-wrapper title="The 12-column grid">
+    <ui-content-group-wrapper title="container > row > col-*">
+      <ui-text-block text="Bootstrap's layout is a 12-column grid. Wrap content in a .container (centred, max-width per breakpoint), put a .row inside, then .col-* columns whose spans add up to 12. Responsive breakpoints are baked into the class name with a mobile-first ladder: col-12 always; col-sm- ≥ 576px; col-md- ≥ 768px; col-lg- ≥ 992px; col-xl- ≥ 1200px; col-xxl- ≥ 1400px. So col-12 col-md-6 means 'full width on mobile, half-width from the md breakpoint up'. The gutter between columns comes from the row's .g-* (gutter) classes — no manual margins." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.grid"
+        caption="container > row > col-* with the mobile-first breakpoint ladder."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: real Bootstrap columns, swap the split">
+      <ui-text-block text="Flip between four common splits. Each renders with real Bootstrap .container / .row / .col-* classes (Bootstrap's CSS is loaded by this view). Resize the window: every split stacks at col-12 on mobile and only fans out at md and above — that is the mobile-first cascade at work." />
+      <ui-example label="Bootstrap grid — interactive split">
+        <app-bootstrap-grid-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 4. Components -->
+  <ui-section-wrapper title="Ready-made components">
+    <ui-content-group-wrapper title="Buttons, badges, cards, alerts">
+      <ui-text-block text="Bootstrap ships styled components as class names: .btn plus a variant (.btn-primary, .btn-outline-…, sizes .btn-lg/.btn-sm, states like disabled); .badge for counts and tags (with .text-bg-* colour combos and .rounded-pill); .card as a flexible container (.card-body, .card-title, .card-text); .alert for contextual feedback (.alert-success/warning/danger/info). All of these are CSS-only — no JavaScript required — so they render exactly as Bootstrap intends the moment the stylesheet is loaded." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.components"
+        caption="Buttons, badges, a card, and alerts — all class-name components."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: buttons + badges">
+      <ui-text-block text="Real .btn variants and sizes, and .badge counts — including the inbox badge positioned absolutely over its button. No custom CSS on any of these elements." />
+      <ui-example label="Buttons and badges">
+        <app-bootstrap-buttons-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: card + dismissible alerts">
+      <ui-text-block text="A real .card next to four .alert variants. Bootstrap's .alert-dismissible normally closes via Bootstrap's JS; we load CSS only, so the close button is wired with a signal + @if — click one to dismiss, then restore. This pattern (signal drives the @if, no JS dependency) is the Angular-idiomatic equivalent." />
+      <ui-example label="Card and alerts">
+        <app-bootstrap-card-alert-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 5. Forms -->
+  <ui-section-wrapper title="Forms">
+    <ui-content-group-wrapper title="form-label + form-control rows">
+      <ui-text-block text="Bootstrap's form layout is a small set of classes repeated: a .mb-3 wrapper per field, a .form-label, and a .form-control (input) or .form-select (select). Checkboxes and radios use .form-check + .form-check-input + .form-check-label. The layout/spacing is Bootstrap's; the Angular wiring underneath is ordinary two-way value flow — [value] + (input) into signals, exactly as you would without Bootstrap. The classes are presentation; the data flow is framework-native." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.form"
+        caption="A Bootstrap form: .mb-3 rows, .form-label + .form-control / .form-select / .form-check."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: form controls wired to signals">
+      <ui-text-block text="Type in the input, pick a role, toggle the checkbox — the readout below the form is rendered with this app's OWN token typography (var(--…)), on the same page as the Bootstrap form. The two systems coexist without conflict." />
+      <ui-example label="Bootstrap form, signal-driven">
+        <app-bootstrap-form-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 6. Navbar -->
+  <ui-section-wrapper title="Navbar">
+    <ui-content-group-wrapper title="Static markup — interactive bits need Angular-native ports">
+      <ui-text-block text="The .navbar with .navbar-brand and .nav-link is CSS-only and renders fine. The collapse/toggle behaviour on mobile (.navbar-toggler) is one of Bootstrap's JS-driven components: it needs Bootstrap's JS bundle, which in an Angular app you should NOT load directly (it mutates the DOM outside Angular's change detection and fights the renderer). The Angular-idiomatic answer is an Angular-native port — ng-bootstrap or ngx-bootstrap — which reimplements every interactive Bootstrap component as a standalone directive/component. This screen loads CSS only, so the demo renders the links inline and skips the toggler." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.navbar"
+        caption="A static navbar. For the collapse toggle, use ng-bootstrap / ngx-bootstrap."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: static navbar">
+      <ui-example label="Navbar (CSS only — no toggle)">
+        <app-bootstrap-navbar-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Bootstrap JS in Angular — the three options">
+      <ui-text-block text="Bootstrap's interactive components (dropdown, modal, collapse, offcanvas, toast, tab) all need its JavaScript. You have three options in Angular. (1) Load bootstrap.bundle.js globally — not recommended; it mutates the DOM outside Angular's change detection. (2) Use ng-bootstrap or ngx-bootstrap — recommended; they are Angular-native reimplementations driven by templates and signals, so change detection stays intact. (3) Drive the few classes yourself with signals + @if, which is what the dismissible alert above does — no JS dependency at all." />
+      <ui-code-block
+        language="ts"
+        [code]="snippets.jsNote"
+        caption="Three strategies for Bootstrap's interactive components in Angular."
+      />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 7. Utilities -->
+  <ui-section-wrapper title="Utilities">
+    <ui-content-group-wrapper title="Spacing, flex, text">
+      <ui-text-block text="Bootstrap also ships utility classes — small, single-purpose helpers you compose directly in the template. Spacing follows the {m|p}{t|b|l|r|x|y}-{0..5} pattern (mt-3 = margin-top at level 3; px-2 = horizontal padding at level 2). Flex is d-flex + justify-content-* + align-items-* + gap-*. Text covers text-center, fw-bold, text-uppercase, text-danger, text-bg-primary. These overlap heavily with Tailwind's utilities (covered on the Tailwind screen) but are fewer and less composable. They are the fastest way to nudge Bootstrap components without writing CSS." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.utilities"
+        caption="Spacing, flex, and text utilities — composed directly in the markup."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="Live: utilities in action">
+      <ui-text-block text="Each tile below is pure Bootstrap utilities — no custom CSS. The spacing scale (mt-0 → mt-5) shows the 6-step rhythm Bootstrap uses for every spacing value." />
+      <ui-example label="Utilities: spacing, flex, text">
+        <app-bootstrap-utilities-demo />
+      </ui-example>
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+
+  <!-- 8. Bootstrap vs this app's token system -->
+  <ui-section-wrapper title="Bootstrap vs this app's token system">
+    <ui-content-group-wrapper title="A pre-designed framework vs a token design system">
+      <ui-text-block text="Bootstrap gives you pre-designed components with a default look — fast to ship, opinionated, hard to make look like anything other than Bootstrap. This app goes the other way: its design system is a set of var(--…) custom properties (colours, spacing, radius, shadows, typography) consumed by hand-written component classes. There is no default look imposed — every component composes its appearance from tokens, and dark mode is a [data-theme] attribute flip that re-points the same tokens. The two approaches are not exclusive in practice (you can theme Bootstrap with Sass overrides that read your tokens), but for a teaching app whose entire point is the token architecture, reaching for Bootstrap globally would undercut the lesson. Hence: Bootstrap in isolation here, tokens everywhere else." />
+      <ui-code-block
+        language="html"
+        [code]="snippets.comparison"
+        caption="Same button, two philosophies: Bootstrap's .btn-primary vs the app's token-consuming class."
+      />
+    </ui-content-group-wrapper>
+
+    <ui-content-group-wrapper title="When you would actually pick Bootstrap">
+      <ui-text-block text="Bootstrap shines for internal tools, admin dashboards, and prototypes where 'looks like Bootstrap' is good enough and the engineering cost of a bespoke design system is not justified. It is also a reasonable starting point for teams without a designer. It is the wrong pick when the product has a distinct brand identity, when you need fine-grained theming (light/dark, density, multiple brands), or when the bundle cost of shipping Bootstrap's CSS site-wide matters — a token system you control wins on all three. This app is deliberately in the second camp." />
+    </ui-content-group-wrapper>
+  </ui-section-wrapper>
+</div>
