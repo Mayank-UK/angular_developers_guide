@@ -1,4 +1,10 @@
 <div class="shell">
+  <div
+    class="route-progress"
+    [class.route-progress--active]="routeLoading()"
+    aria-hidden="true"
+  ></div>
+
   <header class="header">
     @if (pathname() !== '/') {
       <button

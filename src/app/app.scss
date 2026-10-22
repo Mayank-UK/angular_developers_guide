@@ -12,6 +12,40 @@
   min-height: 100vh;
 }
 
+/* Route-level pending indicator — thin top bar shown while a lazy route's
+   chunk is in flight. Pure CSS animation: the active class fades the bar in
+   and creeps scaleX toward 0.85 over 8s (no JS ticks); removing the class
+   hides it instantly (the base rule has no transition). Mirrors the react
+   guide's `.route-progress`. */
+.route-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  height: 2px;
+  pointer-events: none;
+  background: var(--color-primary);
+  transform: scaleX(0);
+  transform-origin: left;
+  opacity: 0;
+}
+
+.route-progress--active {
+  opacity: 1;
+  transform: scaleX(0.85);
+  transition:
+    transform 8s cubic-bezier(0.05, 0.6, 0.15, 1),
+    opacity 100ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-progress--active {
+    /* No creep animation — the bar appears at its full width immediately. */
+    transition: opacity 100ms ease-out;
+  }
+}
+
 .header {
   position: sticky;
   top: 0;

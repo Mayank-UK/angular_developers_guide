@@ -2,7 +2,7 @@ import {
   ApplicationConfig,
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { PreloadAllModules, provideRouter, withPreloading } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideStore } from '@ngrx/store';
 import { provideEffects } from '@ngrx/effects';
@@ -34,7 +34,11 @@ import { TodosStore } from './views/state_management/signal_store/todos-store/to
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    provideRouter(routes),
+    // Preload every lazy route's chunk in the background after startup so
+    // section clicks resolve instantly on warm visits (chunks are small,
+    // 40–162 kB). No guards/canMatch exist on the route table, so preloading
+    // is side-effect free.
+    provideRouter(routes, withPreloading(PreloadAllModules)),
     provideHttpClient(withInterceptors([retryInterceptor])),
     provideData(createAppConfig(environment)),
     provideStore({ todos: todosReducer }),
