@@ -1,0 +1,30 @@
+# CI override — merged OVER the prod compose file by the CI workflow's e2e
+# job (and by local dry-runs of the same flow):
+#   docker compose -f .docker/docker-compose.prod.yml \
+#     -f .docker/docker-compose.ci.yml up -d --wait
+#
+# What the override changes, and why:
+# - the web image is pinned to the locally built :ci tag, and its container
+#   name is pinned to a fixed *_ci name (the prod file's ${COLOR:-blue}
+#   interpolation then cannot matter). Compose interpolates each file BEFORE
+#   merging, so the prod file's ${IMAGE_TAG:?} still fires — the sibling .env
+#   in this directory (IMAGE_TAG=ci) is what auto-loads to satisfy it: no
+#   registry, no IMAGE_TAG env, `config -q` succeeds bare;
+# - web publishes on the loopback only — exactly where prod's commented debug
+#   hatch puts it — so the health probe and Playwright reach the real front
+#   door at 127.0.0.1:8080;
+# - the job creates the external adg_frontend network idempotently before
+#   `up` (external resources are looked up, never created, by compose
+#   itself). `down -v` then removes only what the project owns — the
+#   external network is never touched.
+#
+# The distinct project name isolates CI runs from the real prod stacks'
+# containers and volumes.
+name: angular_developers_guide_ci
+
+services:
+  web:
+    image: ghcr.io/mayank-uk/angular-guide-web:ci
+    container_name: angular_developers_guide_ci_web
+    ports:
+      - "127.0.0.1:8080:8080"

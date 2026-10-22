@@ -4,7 +4,12 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+# --legacy-peer-deps is deliberate: the latest STABLE NgRx is 21.1.1, whose
+# peerDependencies pin @angular/core ^21, but this project is on Angular 22.1
+# (the two work fine together at runtime; NgRx 22 has no stable cut yet).
+# Plain `npm ci` fails with ERESOLVE on this peer conflict — same flag as
+# Dockerfile.dev; see ARCHITECTURE.md "NgRx peer-dependency".
+RUN npm ci --legacy-peer-deps
 
 COPY . .
 RUN npm run build
@@ -13,16 +18,27 @@ RUN npm run build
 FROM nginx:alpine AS runner
 
 # COPY paths are still relative to the build context (project root),
-# so .docker/nginx/* correctly reference our files. nginx.conf relocates the
-# pid + temp paths to /tmp so the process can run fully as the non-root `nginx`
-# user (no privileged ports — we listen on 8080).
-COPY .docker/nginx/nginx.conf /etc/nginx/nginx.conf
+# so .docker/nginx/default.conf correctly references our file.
 COPY .docker/nginx/default.conf /etc/nginx/conf.d/default.conf
-# Angular 22 application builder emits to dist/<app-name>/browser/
+# The Angular application builder emits to dist/<project-name>/browser/
+# (project "angular_developers_guide" — verified against the real build
+# output; angular.json sets no custom outputPath). Only the browser
+# output is served; the media/prerender manifests are not web assets.
 COPY --from=builder /app/dist/angular_developers_guide/browser /usr/share/nginx/html
 
-# The non-root `nginx` user only needs to read the html; own it for safety.
-RUN chown -R nginx:nginx /usr/share/nginx/html
+# Drop privileges: nginx listens on the unprivileged port 8080 so the whole
+# process can run as the non-root `nginx` user (no privileged port binding).
+# Non-root prep, while this RUN still has root — a non-root master cannot
+# create these itself (stock image leaves them root-owned):
+# - the five temp/cache dirs nginx mkdirs at startup;
+# - the pid file moves to /tmp (world-writable); /var/run stays root-owned;
+# - the static tree is owned by `nginx` (the stock entrypoint skips its
+#   default chown when it is not root).
+RUN mkdir -p /var/cache/nginx/client_temp /var/cache/nginx/proxy_temp \
+        /var/cache/nginx/fastcgi_temp /var/cache/nginx/uwsgi_temp \
+        /var/cache/nginx/scgi_temp \
+    && chown -R nginx:nginx /var/cache/nginx /usr/share/nginx/html \
+    && sed -i 's|pid  */\(var/\)\?run/nginx\.pid|pid /tmp/nginx.pid|' /etc/nginx/nginx.conf
 
 USER nginx
 

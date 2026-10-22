@@ -1,10 +1,33 @@
+# PER-RELEASE APP STACK — booted per deploy under the project of one color:
+#   COLOR=blue  IMAGE_TAG=sha-abc1234 docker compose -p adg_blue  -f <this file> up -d --wait
+#   COLOR=green IMAGE_TAG=sha-def5678 docker compose -p adg_green -f <this file> up -d --wait
+# The deploy script ALWAYS exports COLOR deliberately; the ${COLOR:-blue}
+# default below only exists so a bare local `up` boots something (blue).
+# There is deliberately NO top-level name: the -p flag names the project,
+# and the two colors must never share one.
 services:
-  app:
-    build:
-      context: ..
-      dockerfile: .docker/Dockerfile.prod
-    image: angular_developers_guide-prod
-    container_name: angular_developers_guide-prod
+  web:
+    image: "ghcr.io/mayank-uk/angular-guide-web:${IMAGE_TAG:?IMAGE_TAG is required}"
+    container_name: adg_web_${COLOR:-blue}
     restart: unless-stopped
-    ports:
-      - "80:8080"
+    # No published ports — Caddy is the front door (TLS on :443) and reaches
+    # this container BY NAME (adg_web_<color>) on the shared adg_frontend
+    # network; nginx is the app server behind it. Debug hatch (loopback,
+    # non-TLS): - "127.0.0.1:8080:8080"
+    healthcheck:
+      # 127.0.0.1, not localhost: busybox wget resolves localhost to ::1
+      # first and nginx binds IPv4 only.
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - adg_frontend
+
+networks:
+  # Shared with the infra repo's caddy container (external, created by the
+  # deploy): caddy reaches adg_web_<color> here by container name.
+  adg_frontend:
+    name: adg_frontend
+    external: true

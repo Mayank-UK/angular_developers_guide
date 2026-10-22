@@ -11,6 +11,14 @@
 npm-debug.log
 yarn-error.log
 
+# Playwright E2E package artifacts (root /node_modules above does NOT cover
+# e2e/, so the dir is listed explicitly).
+# NOTE: .docker/.env is deliberately committed (IMAGE_TAG=ci interpolation
+# default — not a secret); do not add a blanket .env rule without a negation.
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+
 # IDEs and editors
 .idea/
 .project
