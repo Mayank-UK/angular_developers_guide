@@ -48,7 +48,7 @@ docker compose -f .docker/docker-compose.prod.yml -f .docker/docker-compose.ci.y
 
 On the VM, deploys (`.github/workflows/deploy-production.yml`) boot the same
 image blue/green behind the shared Caddy at
-<https://angulardevelopersguide.makbuilds.duckdns.org/>.
+<https://angulardevelopersguide.mayankcodeworks.com/>.
 
 ## Test
 
