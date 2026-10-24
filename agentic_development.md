@@ -13,27 +13,40 @@
 # AI defined section:
 
 ## Current state
-- Angular 22 teaching app (standalone + signals, strict TS, clean layering domain/data/core/ui with Angular DI as the seam). Read ARCHITECTURE.md (layering, error pipeline, key decisions) before touching code.
+- Angular 22 teaching app (standalone + signals, strict TS, clean layering domain/data/core/ui with Angular DI as the seam).
+  Read ARCHITECTURE.md (layering, error pipeline, key decisions) before touching code.
 - Docker-only tooling: NO node_modules on host — ALL build/test/serve run in Docker; do NOT run npm/ng on the host.
   - dev (HMR, :4200): `docker compose -f .docker/docker-compose.dev.yml up`
   - one-off cmds: `docker compose -f .docker/docker-compose.dev.yml run --rm app <cmd>` (e.g. npm test, npm run build)
   - prod (nginx, loopback :8080): build image `docker build -f .docker/Dockerfile.prod -t ghcr.io/mayank-uk/angular-guide-web:ci .`, then
     `docker compose -f .docker/docker-compose.prod.yml -f .docker/docker-compose.ci.yml up -d --wait` (see README)
-- CRITICAL install gotcha: every `npm ci` (host/CI/Docker) REQUIRES `--legacy-peer-deps` (NgRx 21 peer-pins @angular/core ^21 vs this project's Angular 22 → ERESOLVE; proven 2026-10-22). Already in Dockerfile.prod + ci.yml; keep it anywhere npm ci runs.
-- `ng test` (@angular/build:unit-test, vitest) runs in RUN mode and exits in non-TTY environments (no --watch=false/CI=true needed in CI); explicit watch variant = `npm run test:watch`. Suite today: 79 tests / 13 spec files.
-- CI/CD (2026-10-22, family spec): .github/workflows/ci.yml (test → secrets → e2e → vm-arch → build-push → ghcr-prune) + deploy-production.yml (blue/green via shared caddy; flip file /home/ubuntu/angular_developers_guide/platform/upstream.caddy).
-  - Contracts: image ghcr.io/mayank-uk/angular-guide-web, container adg_web_<color>, network adg_frontend, hostname angulardevelopersguide.mayankcodeworks.com, CI compose project angular_developers_guide_ci.
+- CRITICAL install gotcha: every `npm ci` (host/CI/Docker) REQUIRES `--legacy-peer-deps` — stable NgRx 21 peer-pins @angular/core ^21 vs this
+  project's Angular 22; plain npm ci dies with ERESOLVE (proven 2026-10-22). Already in Dockerfile.prod + ci.yml; keep it anywhere npm ci runs.
+- `ng test` (@angular/build:unit-test, vitest) runs in RUN mode and exits in non-TTY environments — no --watch=false/CI=true needed in CI;
+  explicit watch variant = `npm run test:watch`. Suite today: 79 tests / 13 spec files.
+- CI/CD (2026-10-22, family spec): .github/workflows/ci.yml (test → secrets → e2e → vm-arch → build-push → ghcr-prune)
+  + deploy-production.yml (blue/green via shared caddy; flip file /home/ubuntu/angular_developers_guide/platform/upstream.caddy).
+  - Contracts: image ghcr.io/mayank-uk/angular-guide-web, container adg_web_<color>, network adg_frontend,
+    hostname angulardevelopersguide.mayankcodeworks.com, CI compose project angular_developers_guide_ci.
   - e2e/ = standalone Playwright package (own lockfile, NO webServer, E2E_BASE_URL defaults http://127.0.0.1:8080) — run it against the booted CI stack.
   - Deploy release-scp shape: target `releases/<sha>` + strip_components: 0 (sibling rdg uses strip 1 + /.docker target — do NOT mix the two shapes; double-nests).
 - Domain migrated 2026-10-23: makbuilds.duckdns.org → mayankcodeworks.com (old URLs 301 at the caddy edge).
-- Umami analytics (2026-10-24, master 05d1c95): self-hosted umami.mayankcodeworks.com, website_id 21d8bbbb-f047-4209-b49c-dc4e5f07ebcf; token-gated beacon + typed events topic-open{topic} (NavigationEnd + bootstrap direct report, mutually exclusive — cold deep-links covered) + copy-code{path}.
-  - Angular has no env vars: src/environments/analytics.ts __UMAMI_SRC__/__UMAMI_ID__ tokens + Dockerfile sed swap fed by UMAMI_* repo-level GitHub Variables (never environment-scoped; unreplaced/empty = disabled).
-- REUSE these contracts, do not recreate: design tokens src/ui/design-system/tokens.css (consume var(--…)) + ThemeService; app-hub-view (src/app/views/hub/) + app-placeholder; route paths const src/app/layout/route-paths.ts.
+- Umami analytics (2026-10-24, master 05d1c95): self-hosted umami.mayankcodeworks.com, website_id 21d8bbbb-f047-4209-b49c-dc4e5f07ebcf;
+  token-gated beacon + typed events topic-open{topic} (NavigationEnd + bootstrap direct report, mutually exclusive — cold deep-links covered)
+  + copy-code{path}.
+  - Angular has no env vars: src/environments/analytics.ts __UMAMI_SRC__/__UMAMI_ID__ tokens + Dockerfile sed swap fed by UMAMI_* repo-level
+    GitHub Variables (never environment-scoped; unreplaced/empty = disabled).
+- REUSE these contracts, do not recreate: design tokens src/ui/design-system/tokens.css (consume var(--…)) + ThemeService;
+  app-hub-view (src/app/views/hub/) + app-placeholder; route paths const src/app/layout/route-paths.ts.
   - UI primitives in src/ui/components/: section-wrapper, text-block, code-block, example, content-group-wrapper, link-card, show-error, theme-toggle.
-- Core/domain/data layers complete; views resolve data ONLY via DI tokens (src/core/di/tokens.ts: POST_REPOSITORY, GET_POSTS_USE_CASE, APP_CONFIG) using inject(...). Enforced by src/architecture-invariants.spec.ts.
-- Conventions: const-object + literal union, NEVER enum. A view never imports a DTO/DAO/HttpClient. Match the surrounding code's style. Documented teaching-zone exceptions: database_handling/demo-cache-wiring.ts, state_management/rxjs_server_state/**.
-- All 24 screens implemented + polished; every screen its own lazy OnPush standalone chunk (signals input()/output()/model()/viewChild()); route-loading progress bar in root shell + withPreloading(PreloadAllModules) (route table verified guard-free).
-- Process: build each screen as a SUBAGENT pointed at the matching react_developers_guide screen (src/ui/views/<name>/) as reference, adapted to Angular idioms; update this file after each screen lands.
+- Core/domain/data layers complete; views resolve data ONLY via DI tokens (src/core/di/tokens.ts: POST_REPOSITORY, GET_POSTS_USE_CASE, APP_CONFIG)
+  using inject(...). Enforced by src/architecture-invariants.spec.ts.
+- Conventions: const-object + literal union, NEVER enum. A view never imports a DTO/DAO/HttpClient. Match the surrounding code's style.
+  Documented teaching-zone exceptions: database_handling/demo-cache-wiring.ts, state_management/rxjs_server_state/**.
+- All 24 screens implemented + polished; every screen its own lazy OnPush standalone chunk (signals input()/output()/model()/viewChild());
+  route-loading progress bar in root shell + withPreloading(PreloadAllModules) (route table verified guard-free).
+- Process: build each screen as a SUBAGENT pointed at the matching react_developers_guide screen (src/ui/views/<name>/) as reference,
+  adapted to Angular idioms; update this file after each screen lands.
 - History (one-time setup, all screens, 2026-08-07 senior review 9-10/10 + 5 surgical refactors, polish pass, 2026-10-22 CI/CD + route-loading UX) → archived in devlog.md.
 
 ## Active tasks
