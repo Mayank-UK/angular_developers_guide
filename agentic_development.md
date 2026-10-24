@@ -2,159 +2,39 @@
   - I want to implement an angular project /Development/personal/angular/angular_developers_guide following the code architecture similar to Development/personal/react/react_developers_guide, separating ui, domain, data layer, error handling, state management, etc
   - I will add my requirements to this file marked as "⏳" and as you keep finishing them, you can replace "⏳" with "✅"
 
-- Handoff (read this first)
-  - STATUS: the "One time setup for application architecture" section below is 100% ✅ and verified INSIDE Docker. Only the per-screen "Tasks" remain — each screen is currently a styled placeholder.
-  - Docker-only tooling: there is NO node_modules on the host. ALL build/test/serve run in Docker. Do NOT run `npm`/`ng` on the host.
-    - dev (HMR, :4200): `docker compose -f .docker/docker-compose.dev.yml up`
-    - one-off cmd: `docker compose -f .docker/docker-compose.dev.yml run --rm app <cmd>` (e.g. `npm test`, `npm run build`)
-    - prod (nginx, loopback :8080): build image then boot prod+CI override — `docker build -f .docker/Dockerfile.prod -t ghcr.io/mayank-uk/angular-guide-web:ci .` + `docker compose -f .docker/docker-compose.prod.yml -f .docker/docker-compose.ci.yml up -d --wait` (see README)
-  - CI/CD (2026-10-22, mirrors the react/portfolio/express family spec): `.github/workflows/ci.yml` (test → secrets → e2e → vm-arch → build-push → ghcr-prune) + `deploy-production.yml` (blue/green via shared caddy, flip file `/home/ubuntu/angular_developers_guide/platform/upstream.caddy`). Contracts: image `ghcr.io/mayank-uk/angular-guide-web`, container `adg_web_<color>`, network `adg_frontend`, hostname angulardevelopersguide.mayankcodeworks.com, CI compose project `angular_developers_guide_ci`. e2e/ is a standalone Playwright package (own lockfile, no webServer, E2E_BASE_URL defaults http://127.0.0.1:8080) — run it against the booted CI stack.
-  - Domain migrated 2026-10-23: makbuilds.duckdns.org → mayankcodeworks.com (old URLs 301 at the caddy edge).
-  - Umami analytics live (2026-10-24, master 05d1c95): self-hosted umami.mayankcodeworks.com, website_id 21d8bbbb-f047-4209-b49c-dc4e5f07ebcf — token-gated beacon + typed events: topic-open{topic} (NavigationEnd + bootstrap direct report, mutually exclusive — cold deep-links covered) + copy-code{path}. Angular has no env vars: src/environments/analytics.ts __UMAMI_SRC__/__UMAMI_ID__ tokens + Dockerfile sed swap fed by UMAMI_* repo-level GitHub Variables (never environment-scoped; unreplaced/empty = disabled). Verified /lifecycle via runtime DOM check + real event + UTM pageview in umami postgres (static greps are false negatives).
-  - CRITICAL install gotcha: `npm ci` (host, CI, Docker) REQUIRES `--legacy-peer-deps` — stable NgRx 21 peer-pins @angular/core ^21 vs this project's Angular 22; plain npm ci dies with ERESOLVE (proven 2026-10-22). Already handled in Dockerfile.prod + ci.yml; keep it anywhere npm ci runs.
-  - `ng test` (@angular/build:unit-test, vitest) runs in RUN mode and exits in non-TTY environments (proven 2026-10-22: 79/79 pass, exit 0) — no `--watch=false`/CI=true needed in CI. `npm run test:watch` is the explicit watch variant.
-  - Read ARCHITECTURE.md for layering + the error pipeline + key decisions before touching code.
-  - Read ARCHITECTURE.md for layering + the error pipeline + key decisions before touching code.
-  - REUSE these existing contracts (do not recreate): design-system tokens (`src/ui/design-system/tokens.css`, consume `var(--…)`) + ThemeService; UI primitives in `src/ui/components/` (section-wrapper, text-block, code-block, example, content-group-wrapper, link-card, show-error, theme-toggle); reusable `app-hub-view` (`src/app/views/hub/`) + `app-placeholder`; route paths const in `src/app/layout/route-paths.ts`. Core/domain/data layers are complete — views resolve data only via DI tokens (`src/core/di/tokens.ts`: POST_REPOSITORY, GET_POSTS_USE_CASE, APP_CONFIG) using `inject(...)`.
-  - Each screen is a heavy isolated task → build it as a SUBAGENT (keeps the master chat lean). Point the subagent at the matching react_developers_guide screen (`src/ui/views/<name>/`) as the reference to mirror, adapted to Angular idioms (signals, standalone OnPush components, `input()`/`output()`).
-  - Convention reminders: const-object + literal union, NEVER enum. A view never imports a DTO/DAO/HttpClient. Match the surrounding code's style. Update this file (mark ⏳→✅, append a dated progress-log entry) after each screen lands.
-
 - Generic instructions:
   - You have to build UI using the design system implemented in the application
   - You have to follow the proper architecture that is followed in the application, for example, having use cases, repositories, repositoriesImpl, remote, DTOs, local, DAOs, exception handling, and so on
-  - You have to check if existing components can be reused instead of creating new ones. If a component is to be used in a single file, then better to make it a function inside that view. If a component is to be used in multiple files, then create it inside the global ui/components
+  - You have to check if existing components can be reused instead of creating new ones. If a component is to be used in a single file, better to make it a function inside that view. If a component is to be used in multiple files, create it inside the global ui/components
   - If feeling confused about how to do things, you are free to check how it's done in other parts of this app; the goal is to maintain consistency throughout the app
   - Before proceeding to the next task, calculate if continuing the next task in this chat will be more token efficient or continuing in new chat, and recommend me when its better to move to new chat
   - Please follow best practices of angular while building this project
 
-- One time setup for application architecture (Remove this section after implementation)
-  - Angular project scaffold (standalone components, signals, application builder, strict TS) ✅
-  - Docker setup (Dockerfile for dev + prod multi-stage, docker-compose, .devcontainer) mirroring react_developers_guide ✅
-    - Docker-first: NO node_modules on host; all build/test/serve run in container. Dev image HMR on :4200; prod multi-stage nginx on :8080 (host :80) run as non-root `nginx` (custom nginx.conf relocates pid+temp to /tmp). Verified: dev build 360 kB, 36 tests pass, prod HTTP 200 + SPA fallback.
-  - Most standard and optimum (for angular) navigation and routing implementation ✅ (shell + route table)
-    - Angular Router with lazy-loaded standalone routes, route data titles, and a root layout (header + router-outlet + drawer)
-    - Routes in src/app/app.routes.ts (lazy loadComponent, named `routes` export); shell = src/app/app.ts; nav paths in src/app/layout/route-paths.ts
-    - Placeholder screens live under src/app/views/<name>/ and render the shared primitives; hubs (home, ui_hub, state_management) render real nav grids via app-hub-view
-  - Most standard and optimum (for angular) Full clean architecture pipeline implementation from fetching posts (usecase, repository, DTOs, DAOs, remote, local, fake impls); check react developers guide for reference ✅
-    - domain/ (models, repository interfaces, usecases) → pure, framework-free
-    - data/remote (HttpClient + DTOs + interceptors), data/local (IndexedDB/Dexie + DAOs), data/repositories (PostRepositoryImpl, offline-first), data/fake (in-memory fakes for dev + tests)
-    - core/di/tokens.ts seam: POST_REPOSITORY, GET_POSTS_USE_CASE, APP_CONFIG; httpErrorToException maps HttpErrorResponse→AppException; retry.interceptor (HttpInterceptorFn) idempotent+jittered, never retries AppExceptions
-  - Dependency management setup implementation ✅
-    - Angular native DI (InjectionToken + providers) instead of react's hand-rolled container; fake-vs-live wiring swappable per environment
-    - data/providers.ts provideData(config) registers fake-vs-live (chosen from AppConfig.wiring) + repository/use-case tokens; getWiring(config) exposes runtime swap for introspection
-  - Exception handling implementation, take reference from react_developers_guide ✅
-    - Two-stage pipeline: AppException (data-layer, typed, chained via .cause) → Failure (domain/presentation, kind + severity + user message) → Result<T> (Success<T, warning?> | Failed)
-    - Severity-driven presentation: critical → full-screen ShowError; warning/info → non-blocking snackbar
-  - Design system implementation ✅
-    - Token-driven: CSS custom properties as single source of truth, dark mode via [data-theme] attribute flip; tokens consumed by component styles and (where used) Tailwind
-    - Look for reference implementation in react_developers_guide; must be used throughout the UI
-    - Tokens ported to src/ui/design-system/tokens.css (verbatim :root + [data-theme='dark']); DSSizes/DSShadows TS mirrors; ThemeService (signal) writes data-theme + localStorage
-    - UI primitives under src/ui/components/: theme-toggle, code-block, section-wrapper, content-group-wrapper, text-block, example, link-card, show-error (decoupled from core/domain via plain inputs)
-  - Environments/flavours setup ✅
-    - Angular environments (environments.ts / environments.development.ts / environments.staging.ts) wired via angular.json fileReplacements for dev/staging/prod
-    - Each carries production/name/wiring(fake|live)/apiBaseUrl/scenario; core/config createAppConfig → typed AppConfig
-  - Testing infrastructure ✅
-    - Angular-native test runner (Vitest via @angular/build:unit-test) + TestBed; specs render the real DI/router tree (integration-style) plus pure unit tests for core (result, guards/stringify, config) and data/providers
-    - src/test/setup.ts polyfills window.matchMedia (jsdom omits it) so ThemeService constructs under test; 36 tests passing
-  - ARCHITECTURE.md documenting layering, error pipeline, key decisions, and testing posture (mirror react guide) ✅
-  - Root README.md with run/build/test commands ✅ (Docker-first workflow documented)
+# AI defined section:
 
-- Tasks
-  - Angular fundamentals screen ✅
-    - Include everything fundamental to angular (components, templates, directives, pipes, modules vs standalone, signals, two-way binding, content projection, dynamic components)
-    - Put all angular fundamentals in a single screen instead of separate screens
-  - Typescript/Javascript fundamentals screen ✅
-    - Include all things like variables, consts, loops, conditions, types, generics, etc
-    - Put all typescript/javascript fundamentals in a single screen instead of separate screens
-  - UI section ✅
-    - UI manipulation section
-      - Layout and structure screen ✅
-      - Styling
-        - CSS screen ✅
-        - Bootstrap screen ✅
-        - Tailwind screen ✅
-      - Interactive behaviours screen ✅
-        - Like click, hover, focus, etc (Angular event bindings, HostListener, signals)
-    - Responsive layout screen ✅
-      - How responsiveness is implemented in angular in standard way (CSS, container queries, Tailwind, Bootstrap grid)
-    - Design system screen ✅
-  - Lifecycle screen ✅
-    - Show how each and every angular lifecycle hook is used (ngOnChanges, ngOnInit, ngDoCheck, ngAfterContentInit/Checked, ngAfterViewInit/Checked, ngOnDestroy) plus Signals (effect, computed, signal, afterRender/afterNextRender)
-  - Navigation and routing screen ✅
-    - Angular Router: routes, lazy loading, route guards, resolver, child routes, queryParams/fragments, routerLink active
-  - State management section ✅
-    - Reason and inform how each is used (informed via the hub's "which state are you managing?" framing + each screen's "when to use" prose)
-    - Signals screen (local/component state) ✅
-      - Implement a simple todo example
-    - NgRx Store screen (global client state) ✅
-      - Implement a simple todo example
-    - NgRx SignalStore screen (lightweight global/store state) ✅
-      - Implement a simple todo example
-    - RxJS / server-state screen (HttpClient + interceptors / caching) ✅
-      - Implement a simple todo example
-  - API handling ✅
-    - Implement fetching of posts with full pipeline (usecase, repository, DTOs, remote) the angular way (HttpClient) ✅
-    - Implement API handling screen where an example is implemented to fetch and show posts explaining how it's done ✅
-  - Database handling ✅
-    - Local persistence (IndexedDB/Dexie DAOs) implemented during the architecture pipeline
-    - Implement Database handling screen explaining how it's done ✅
-  - Exception handling ✅
-    - Error pipeline implemented during the architecture setup
-    - Implement Exception handling screen explaining how it's done ✅
-  - Dependency management ✅
-    - Implement dependency management screen explaining how it's done in angular (native DI, InjectionToken, providers, multi-providers, environments swap) ✅
-  - Architecture screen ✅
-    - Explaining how code is architectured in angular in the most maintainable way (domain/data/core/ui layers, DI as the seam) ✅
-  - Testing ✅
-    - Implement tests ✅ (infra + smoke/error-pipeline tests in place; per-layer coverage expanded — 71 tests across 12 spec files)
-    - Implement testing screen explaining how it's done in angular ✅
-  - Debugging screen ✅
-    - Explaining how debugging is done in angular (Angular DevTools, Augury legacy, source maps, RxJS tap/console, error pipeline logs) ✅
-  - Environments/Flavours for dev, staging, and prod ✅
-    - Implement different environments ✅
-    - Implement environment screen explaining how it's done in angular ✅
-  - Best practices screen ✅
-    - Explaining how things are done in the best way in angular for performance, efficiency, maintenance (OnPush/change detection, signals, lazy loading, trackBy, standalone) ✅
-  - Drawer ✅
-    - Include only about screen (verified: src/app/app.html drawer panel surfaces only the About link; the About screen itself is the canonical about surface)
-  - Review code and refactor to take implementation to 10/10 ✅ (senior review pass — Part A flagged items + Part B holistic sweep; details in the 2026-08-07 progress-log entry)
-    - Review from the perspective of a developer who has 10 years experience in angular and 30 years in software development, who knows all best and bad practices, whose code is simple yet robust
-    - Review architecture, design system, signal/rxjs store logic, DI wiring, all other aspects
-  - Architecture-invariant + correctness refactor pass ✅ (folded into the 2026-08-07 review pass)
-  - Polish pass ✅ (run after refactor pass — design + UX sweep of all 24 screens; details in the 2026-08-07 polish-log entry)
-  - Review code and refactor to take implementation to 10/10 ✅ (senior review pass — 2026-08-07; details below)
-    - Review from the perspective of a developer who has 10 years of experience in angular and 30 years of experience in Software development, who knows all the best practices and bad practices, whose code is simple to understand yet robust
-    - Review how architecture is implemented
-    - Review how design system is implemented
-    - Review how hook files and logic inside them are implemented, if this is even standard or just spaghetti code
-    - Review all other aspects
+## Current state
+- Angular 22 teaching app (standalone + signals, strict TS, clean layering domain/data/core/ui with Angular DI as the seam). Read ARCHITECTURE.md (layering, error pipeline, key decisions) before touching code.
+- Docker-only tooling: NO node_modules on host — ALL build/test/serve run in Docker; do NOT run npm/ng on the host.
+  - dev (HMR, :4200): `docker compose -f .docker/docker-compose.dev.yml up`
+  - one-off cmds: `docker compose -f .docker/docker-compose.dev.yml run --rm app <cmd>` (e.g. npm test, npm run build)
+  - prod (nginx, loopback :8080): build image `docker build -f .docker/Dockerfile.prod -t ghcr.io/mayank-uk/angular-guide-web:ci .`, then
+    `docker compose -f .docker/docker-compose.prod.yml -f .docker/docker-compose.ci.yml up -d --wait` (see README)
+- CRITICAL install gotcha: every `npm ci` (host/CI/Docker) REQUIRES `--legacy-peer-deps` (NgRx 21 peer-pins @angular/core ^21 vs this project's Angular 22 → ERESOLVE; proven 2026-10-22). Already in Dockerfile.prod + ci.yml; keep it anywhere npm ci runs.
+- `ng test` (@angular/build:unit-test, vitest) runs in RUN mode and exits in non-TTY environments (no --watch=false/CI=true needed in CI); explicit watch variant = `npm run test:watch`. Suite today: 79 tests / 13 spec files.
+- CI/CD (2026-10-22, family spec): .github/workflows/ci.yml (test → secrets → e2e → vm-arch → build-push → ghcr-prune) + deploy-production.yml (blue/green via shared caddy; flip file /home/ubuntu/angular_developers_guide/platform/upstream.caddy).
+  - Contracts: image ghcr.io/mayank-uk/angular-guide-web, container adg_web_<color>, network adg_frontend, hostname angulardevelopersguide.mayankcodeworks.com, CI compose project angular_developers_guide_ci.
+  - e2e/ = standalone Playwright package (own lockfile, NO webServer, E2E_BASE_URL defaults http://127.0.0.1:8080) — run it against the booted CI stack.
+  - Deploy release-scp shape: target `releases/<sha>` + strip_components: 0 (sibling rdg uses strip 1 + /.docker target — do NOT mix the two shapes; double-nests).
+- Domain migrated 2026-10-23: makbuilds.duckdns.org → mayankcodeworks.com (old URLs 301 at the caddy edge).
+- Umami analytics (2026-10-24, master 05d1c95): self-hosted umami.mayankcodeworks.com, website_id 21d8bbbb-f047-4209-b49c-dc4e5f07ebcf; token-gated beacon + typed events topic-open{topic} (NavigationEnd + bootstrap direct report, mutually exclusive — cold deep-links covered) + copy-code{path}.
+  - Angular has no env vars: src/environments/analytics.ts __UMAMI_SRC__/__UMAMI_ID__ tokens + Dockerfile sed swap fed by UMAMI_* repo-level GitHub Variables (never environment-scoped; unreplaced/empty = disabled).
+- REUSE these contracts, do not recreate: design tokens src/ui/design-system/tokens.css (consume var(--…)) + ThemeService; app-hub-view (src/app/views/hub/) + app-placeholder; route paths const src/app/layout/route-paths.ts.
+  - UI primitives in src/ui/components/: section-wrapper, text-block, code-block, example, content-group-wrapper, link-card, show-error, theme-toggle.
+- Core/domain/data layers complete; views resolve data ONLY via DI tokens (src/core/di/tokens.ts: POST_REPOSITORY, GET_POSTS_USE_CASE, APP_CONFIG) using inject(...). Enforced by src/architecture-invariants.spec.ts.
+- Conventions: const-object + literal union, NEVER enum. A view never imports a DTO/DAO/HttpClient. Match the surrounding code's style. Documented teaching-zone exceptions: database_handling/demo-cache-wiring.ts, state_management/rxjs_server_state/**.
+- All 24 screens implemented + polished; every screen its own lazy OnPush standalone chunk (signals input()/output()/model()/viewChild()); route-loading progress bar in root shell + withPreloading(PreloadAllModules) (route table verified guard-free).
+- Process: build each screen as a SUBAGENT pointed at the matching react_developers_guide screen (src/ui/views/<name>/) as reference, adapted to Angular idioms; update this file after each screen lands.
+- History (one-time setup, all screens, 2026-08-07 senior review 9-10/10 + 5 surgical refactors, polish pass, 2026-10-22 CI/CD + route-loading UX) → archived in devlog.md.
 
-  - 2026-08-07 review-log (final 10/10 pass):
-    - Verdict: implementation is at a 9-10/10 level. Layering, error pipeline, DI seam, design-system tokens, and per-screen component logic are idiomatic Angular 22 — not spaghetti. Only two surgical refactors were needed; no screen was rewritten.
-    - Architecture (focus 1): clean. domain/ framework-free, data/ never imports ui/app, views reach data ONLY via inject(POST_REPOSITORY)/inject(GET_POSTS_USE_CASE)/inject(APP_CONFIG) — enforced by src/architecture-invariants.spec.ts (8 tests, all green). The two documented teaching zones (database_handling/demo-cache-wiring.ts, state_management/rxjs_server_state/**) remain the only exceptions. provideData(config) fake-vs-live wiring is type-safe (Type<PostRemoteDataSource>/Type<AppDatabase>) and HttpClient is correctly NOT provided there. Result<T> discriminated union + AppException→Failure pipeline is robust and chain-preserving.
-    - Design system (focus 2): clean. tokens.css is the single source of truth, [data-theme='dark'] flips correctly via ThemeService signal + effect (DOM attribute + localStorage). Grep across src/app/views/**/*.scss+css found ZERO hard-coded hex colors — every screen consumes var(--…). ThemeService resolves initial mode via an extracted, testable pure helper.
-    - Component/hook logic (focus 3 — the key question): idiomatic, NOT spaghetti. Spot-checked every pattern: PostsDemo/CacheDemo (clean Result-driven state machines on signals), TodoDemo (toSignal + switchMap + retry + catchError pipeline), SignalStore (withState/withComputed/withMethods/withHooks + rxMethod persistence), NgRx (pure reducer + dispatch:false persistence effects), responsive (createMediaQuerySignal composable + ResizeObserver via afterNextRender + DestroyRef cleanup). All subscribe() calls are either on HttpClient (auto-completes) or wrapped in takeUntilDestroyed(). Only ONE localised smell found and fixed:
-      - FIXED show-error.ts: `icon` was a method taking the `kind` input as a parameter (template called `icon(kind())`). Refactored to `computed(() => FAILURE_KIND_ICONS[this.kind()])` — the idiomatic signal-derived form. Template updated to `{{ icon() }}`.
-    - Other aspects (focus 4): clean. No `enum` anywhere (invariants spec enforces it). Every real @Component has ChangeDetectionStrategy.OnPush (the two non-OnPush hits are spec files). All @for loops use a stable `track` (no `track $index` anti-pattern on mutating lists). All components are standalone + use signal input()/output()/model()/viewChild() — zero legacy @Input()/@Output() decorators in real code (the lifecycle screen's @Input() usages are intentional teaching material inside code-sample template literals). Lazy loading via loadComponent keeps the initial bundle at 278 kB / ~77 kB gzipped; every screen is its own lazy chunk.
-    - Refactors applied (5 files, all surgical):
-      1. src/app/views/state_management/rxjs_server_state/caching.interceptor.ts — removed a no-op `map((ev) => ev)` operator and its now-unused `map` import; the accompanying comment about "a 1-second timer" was misleading (the actual eviction timer is the module-level `timer(DEFAULT_TTL_MS).subscribe(...)` further down). Pure dead-code removal.
-      2. src/ui/components/show-error/show-error.ts + show-error.html — `icon` was a method that took the `kind` input as a parameter (template called `icon(kind())`); refactored to `computed(() => FAILURE_KIND_ICONS[this.kind()])` and the template to `{{ icon() }}`. The idiomatic signal-derived form.
-      3. src/ui/components/code-block/code-block.ts — `open` was a plain `signal(false)` seeded from `defaultOpen` via an `effect()` with a manual `initialized` boolean latch (a one-shot latch is a known smell). Replaced with `linkedSignal(() => this.defaultOpen())` — the built-in Angular primitive that seeds from an input and stays user-writable. Removed the constructor + latch entirely.
-      4. src/app/views/angular_fundamentals/truncate.pipe.ts — the `TruncatePipe` constructor was empty with an `eslint-disable-next-line @typescript-eslint/no-empty-function` and a comment claiming it was "injected only to demonstrate that pipes can use DI" — but nothing was actually injected, making the lesson literally false. Removed the empty constructor + the unused `inject` import; rewrote the comment to explain accurately (pipes are plain classes and CAN use DI, but this one needs no dependency, so it has no constructor).
-      5. src/app/views/ui/interactive/interactiveview.ts — `ReactiveSignalsDemo`'s effect built a throwaway array `const [_t, _s, _e] = [this.tier(), this.seats(), this.enabled()]` purely to register the signals as dependencies, then logged the underscored locals. Simplified to read each signal inline in the `console.debug` arg list — same tracked dependencies, no throwaway bindings.
-    - Not changed (deliberately, with rationale): the `SeverityDemo.rebuild()` `{ ...this.selected() }` spread-to-force-recompute is marked "demo only" and is the clearest way to express the retry-with-identical-Failure teaching point; the triplicated module-level `todoIdSeq`/`nextTodoId()` counters across the three sibling todo features are intentionally independent teaching modules — coupling them via a shared `core/` helper would muddy the lesson.
-    - Verification: test suite 79/79 pass (13 spec files — same count as baseline, no regressions); `npx tsc --noEmit` clean; `npm run build` clean (prod bundle 278 kB / 76.94 kB gzipped initial).
-    - Skipped: no per-screen polish/rewrite (the task explicitly says "do NOT rewrite screens wholesale" and the screens are already consistent). Did not bump the About screen's "71+ tests" stat tile — it is still factually correct (the floor is what's quoted).
-
-  - 2026-10-22 CI/CD pipeline (family spec, static variant — mirrors react_developers_guide + portfolio):
-    - Built the whole pipeline from scratch (no prior CI/docker-prod infra beyond the old build-based compose):
-      - .docker/Dockerfile.prod reworked: node:22-alpine builder (`npm ci --legacy-peer-deps` — REQUIRED, NgRx 21 peer-pins @angular/core ^21 vs Angular 22) → nginx:alpine non-root :8080 runner with the proven temp-dir fix (pre-create + chown the five /var/cache/nginx temp dirs, pid sed → /tmp/nginx.pid). Copies `dist/angular_developers_guide/browser` (application-builder output, verified — angular.json has no custom outputPath). Old custom .docker/nginx/nginx.conf deleted (superseded by the sed fix); default.conf unchanged (already matched the sibling).
-      - .docker/docker-compose.prod.yml reworked to the spec static contract (service `web`, image ghcr.io/mayank-uk/angular-guide-web:${IMAGE_TAG:?}, container adg_web_${COLOR:-blue}, external adg_frontend, no ports/name/build). NEW docker-compose.ci.yml (name angular_developers_guide_ci, :ci image, fixed container, 127.0.0.1:8080:8080) + .docker/.env (IMAGE_TAG=ci, committable — root .gitignore has no .env rule).
-      - e2e/: standalone Playwright package (own lockfile, NO webServer, E2E_BASE_URL default http://127.0.0.1:8080). 5 specs against real rendered content: home doc+title, 15-card hub grid, zero console errors, angular-fundamentals topic h2s (incl. SPA walk from home), code-block expand-to-real-source. Locators respect the two-h1 shell (scope hub h1 to `main`).
-      - .github/workflows/ci.yml: test (node 22 + npm ci --legacy-peer-deps + npm test — ng test PROVEN run-mode/exits non-TTY — + npm run build), secrets (gitleaks), e2e (buildx :ci amd64 + gha cache + fork-PR cache-write guard, adg_frontend network, prod+ci up --wait, curl retry probe, Playwright chromium, artifacts on failure, teardown always), vm-arch, build-push (attested, sha-<7>+master), ghcr-prune (angular-guide-web, keep-10, never untagged).
-      - .github/workflows/deploy-production.yml: blue/green static deploy; release scp uses express's shape — target `releases/<sha>` + strip_components: 0 → lands at `releases/<sha>/.docker/docker-compose.prod.yml` where APP_COMPOSE reads it (sibling rdg had strip 1 with a /.docker target; do NOT mix the two shapes — double-nests).
-      - .gitignore: added e2e/node_modules|test-results|playwright-report (root `/node_modules` is anchored and did NOT cover e2e/) + .docker/.env-committed note. README prod/test sections updated to the image-based flow.
-    - Verification (all green, 2026-10-22): actionlint 0 findings (both workflows; note: flag is `-color=false`, not `-color false`); `docker compose -f prod -f ci config -q` clean; image built natively; CI stack booted Healthy + curl 200 on 127.0.0.1:8080; e2e 5/5 pass; teardown clean; TODO/FIXME grep clean. Nothing committed/pushed.
-    - Follow-up candidates (not done, out of scope): none blocking. First deploy needs the VM dirs + caddy snippet `adg.caddy` from the infra repo (family-standard, per spec).
-
-  - 2026-10-22 route loading UX (the VM freeze fix, master 1bdf9e6, pushed; CI deploy in flight at write time): section clicks had NO feedback — bare `<router-outlet>` + no preloading. Fix: (1) `routeLoading` signal in the root shell (src/app/app.ts) driven by Router events (Start → arm 180 ms reveal timer; End/Error/Cancel/DestroyRef → clear), rendered as the `.route-progress` 2 px bar in app.html/app.scss (fixed top, `--color-primary`, scaleX creep to 0.85 over 8 s, instant hide, prefers-reduced-motion → opacity-only) mirroring swdg's family pattern; the 180 ms delay keeps instant navigations from ever flashing the bar. Bootstrap edge: blocking router init emits a NavigationStart before the shell subscribes — `sawFirstNavigationStart` is seeded from `router.navigated` so the FIRST user click still shows the bar while bootstrap never does. (2) `withPreloading(PreloadAllModules)` in app.config.ts (chunks 40–162 kB — background preload makes warm section clicks instant; route table verified guard-free so preloading is side-effect-free). Verified in Docker per repo rules: `npm run build` exit 0, `npm test` 13 files / 79 tests ×2 pre/post. No new deps.
+## Active tasks
+- ⏳ First production deploy needs the VM dirs + caddy snippet `adg.caddy` from the infra repo (family-standard, per spec).
