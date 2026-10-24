@@ -34,8 +34,10 @@
 - Umami analytics (2026-10-24, master 05d1c95): self-hosted umami.mayankcodeworks.com, website_id 21d8bbbb-f047-4209-b49c-dc4e5f07ebcf;
   token-gated beacon + typed events topic-open{topic} (NavigationEnd + bootstrap direct report, mutually exclusive — cold deep-links covered)
   + copy-code{path}.
-  - Angular has no env vars: src/environments/analytics.ts __UMAMI_SRC__/__UMAMI_ID__ tokens + Dockerfile sed swap fed by UMAMI_* repo-level
-    GitHub Variables (never environment-scoped; unreplaced/empty = disabled).
+- Angular has no env vars: src/environments/analytics.ts __UMAMI_SRC__/__UMAMI_ID__ tokens + Dockerfile sed swap fed by UMAMI_* repo-level
+  GitHub Variables (never environment-scoped; unreplaced/empty = disabled).
+- Beacon tag carries data-distinct-id (2026-10-25 ✅): stable per-browser visitor id — localStorage 'mcw_vid' UUID minted pre-append; Umami auto-identify dedupes visitors across IP churn.
+  Verify: ng build (Docker) green + dist grep mcw_vid hits browser/chunk-*.js; runtime check pending post-deploy.
 - REUSE these contracts, do not recreate: design tokens src/ui/design-system/tokens.css (consume var(--…)) + ThemeService;
   app-hub-view (src/app/views/hub/) + app-placeholder; route paths const src/app/layout/route-paths.ts.
   - UI primitives in src/ui/components/: section-wrapper, text-block, code-block, example, content-group-wrapper, link-card, show-error, theme-toggle.

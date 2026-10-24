@@ -31,6 +31,9 @@ import { UMAMI_ID, UMAMI_SRC } from '../../environments/analytics';
  * document (dev double-init, rerenders). */
 const UMAMI_SCRIPT_ID = 'umami-analytics';
 
+/** localStorage key holding the per-browser visitor id. */
+const VISITOR_ID_KEY = 'mcw_vid';
+
 /** The Umami beacon's global handle — absent until the script loads (and
  * forever, when analytics is unconfigured). Narrowed to the one method we
  * call; the real object carries more, never less. */
@@ -116,6 +119,35 @@ function analyticsConfig(): { readonly src: string; readonly id: string } | null
 }
 
 /**
+ * Stable per-browser visitor identity for the beacon: Umami reads the
+ * `data-distinct-id` attribute at the beacon's own execution and
+ * auto-fires identify, so the id must sit on the tag BEFORE it is
+ * appended. First call mints a random UUID and persists it. ALL storage
+ * access is guarded — when storage is unavailable (blocked, private
+ * mode) the beacon still works, just without an id.
+ */
+function getDistinctId(): string | undefined {
+  try {
+    const existing = localStorage.getItem(VISITOR_ID_KEY);
+    if (existing) {
+      return existing;
+    }
+    const id =
+      typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : 'v-' +
+          Date.now() +
+          '-' +
+          Math.random().toString(36).slice(2) +
+          Math.random().toString(36).slice(2);
+    localStorage.setItem(VISITOR_ID_KEY, id);
+    return id;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Inject the Umami beacon into <head> — once per document, only when BOTH
  * config values are valid. Called from the root component's init (the app
  * shell constructs once per bootstrap); unconfigured environments (dev,
@@ -134,6 +166,10 @@ export function initAnalytics(): void {
   script.defer = true;
   script.src = config.src;
   script.setAttribute('data-website-id', config.id);
+  const vid = getDistinctId();
+  if (vid) {
+    script.setAttribute('data-distinct-id', vid);
+  }
   document.head.appendChild(script);
   // Async beacon: load → flush what queued during the cold-start window;
   // error (blocked/failed request) → drop the queue, never replay it.
