@@ -12,6 +12,19 @@ COPY package*.json ./
 RUN npm ci --legacy-peer-deps
 
 COPY . .
+
+# Umami analytics build values (repository VARIABLES via CI build-args, not
+# secrets — the values are public in the served page source anyway). Angular
+# reads no env vars at build time, so the family env-var pattern becomes a
+# placeholder swap: src/environments/analytics.ts ships placeholder tokens
+# and this sed replaces them BEFORE ng build. Empty args (the default)
+# produce empty values, which the analytics module treats as unset —
+# analytics stays a complete no-op: no script tag injected, nothing sent.
+# The `|` delimiter survives the `/` and `:` in the URL values.
+ARG UMAMI_SRC=""
+ARG UMAMI_ID=""
+RUN sed -i "s|__UMAMI_SRC__|${UMAMI_SRC}|g; s|__UMAMI_ID__|${UMAMI_ID}|g" src/environments/analytics.ts
+
 RUN npm run build
 
 # ── Stage 2: Serve ────────────────────────────────────────────────────────────

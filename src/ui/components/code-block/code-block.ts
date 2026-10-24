@@ -5,6 +5,7 @@ import {
   linkedSignal,
   signal,
 } from '@angular/core';
+import { trackEvent } from '../../analytics/analytics';
 
 /**
  * CodeBlock — a styled, monospace, copyable code listing that collapses by
@@ -50,6 +51,11 @@ export class CodeBlock {
     event.stopPropagation();
     try {
       await navigator.clipboard.writeText(this.code());
+      // Analytics: only actual copies are counted (the write resolved). The
+      // topic is the current route path — the same identifier topic-open
+      // uses, so the two events join per topic in the dashboard. A no-op in
+      // unconfigured builds.
+      trackEvent('copy-code', { topic: window.location.pathname });
       this.copied.set(true);
       if (this.resetTimer) clearTimeout(this.resetTimer);
       this.resetTimer = setTimeout(() => this.copied.set(false), 1500);

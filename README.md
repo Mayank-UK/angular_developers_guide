@@ -72,6 +72,25 @@ Swapped via Angular `fileReplacements` in `angular.json`:
 - `staging` — `npm run start:staging` / `npm run build:staging` (live backend)
 - `production` — `npm run build` (default)
 
+## Analytics
+
+Traffic is measured with self-hosted [Umami](https://umami.is) at https://umami.mayankcodeworks.com — no cookies, no personal data.
+
+Analytics is build-time gated: Angular reads no env vars at build time, so `src/environments/analytics.ts` ships placeholder tokens that the production Dockerfile swaps with `sed` before `ng build`. The swap values arrive as `UMAMI_SRC` / `UMAMI_ID` Docker build-args from the `UMAMI_*` GitHub repository variables (never committed to the repo), so local dev, tests, and CI builds without the vars run with analytics completely disabled — no script tag is injected and nothing is sent. Both values are public (visible in the served page source anyway).
+
+Events:
+
+| Event        | Property | Fires when                                                                               |
+| ------------ | -------- | ---------------------------------------------------------------------------------------- |
+| `topic-open` | `topic`  | a guide topic/section view opens — route path; covers in-app navigation, direct links, and refreshes |
+| `copy-code`  | `topic`  | a code example's copy button succeeds — route path of the page the block sits on          |
+
+UTM convention for links pointing at https://angulardevelopersguide.mayankcodeworks.com (Umami parses `utm_*` query params automatically): `utm_source` = where the link lives, `utm_medium` = the kind of placement (`readme` \| `post` \| `social`). Examples:
+
+- `https://angulardevelopersguide.mayankcodeworks.com/?utm_source=github&utm_medium=readme`
+- `https://angulardevelopersguide.mayankcodeworks.com/?utm_source=reddit&utm_medium=post`
+- `https://angulardevelopersguide.mayankcodeworks.com/?utm_source=dev.to&utm_medium=post`
+
 ## Project layout
 
 See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the layering, the error pipeline

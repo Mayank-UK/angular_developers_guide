@@ -17,6 +17,7 @@ import {
 } from '@angular/router';
 import { filter } from 'rxjs';
 import { ThemeToggle } from '../ui/components/theme-toggle/theme-toggle';
+import { initAnalytics, trackEvent } from '../ui/analytics/analytics';
 import { RoutePaths } from './layout/route-paths';
 
 /** The route-progress bar is revealed only after this much pending time, so
@@ -62,6 +63,13 @@ export class App {
   private sawFirstNavigationStart = this.router.navigated;
 
   constructor() {
+    // Umami beacon: injected once per document from the root component's
+    // init (the shell constructs exactly once per bootstrap). Idempotent,
+    // and a complete no-op when the config placeholders were never swapped
+    // — dev, test, and CI builds without the Docker build args never see a
+    // script tag.
+    initAnalytics();
+
     this.pathname.set(this.router.url);
     this.router.events
       .pipe(
@@ -94,13 +102,36 @@ export class App {
         if (e instanceof NavigationEnd) {
           this.pathname.set(e.urlAfterRedirects);
           this.drawerOpen.set(false);
+          this.reportTopicOpen(e.urlAfterRedirects);
         }
         // Settled — success, error, or cancel all hide the bar immediately.
         this.endRoutePending();
       });
 
+    // Deep links / refreshes: when the bootstrap navigation already
+    // completed before this component subscribed (see
+    // sawFirstNavigationStart), its NavigationEnd was never seen above —
+    // report the landed topic directly. Otherwise the subscription
+    // delivers the bootstrap NavigationEnd and reports exactly once there.
+    if (this.sawFirstNavigationStart) {
+      this.reportTopicOpen(this.router.url);
+    }
+
     // The pending reveal timer must never fire into a destroyed component.
     this.destroyRef.onDestroy(() => this.endRoutePending());
+  }
+
+  /** Analytics: one topic-open per topic-view activation. The path is the
+   *  route URL with query/fragment stripped — the same identifier
+   *  copy-code uses, so the events join per topic in the dashboard. Home
+   *  is the guide index and About is app chrome — neither is a topic. A
+   *  no-op in unconfigured builds. */
+  private reportTopicOpen(url: string): void {
+    const topic = url.split('?')[0].split('#')[0];
+    if (topic === RoutePaths.home || topic === RoutePaths.about) {
+      return;
+    }
+    trackEvent('topic-open', { topic });
   }
 
   toggleDrawer(): void {
