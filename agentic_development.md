@@ -52,4 +52,5 @@
 - History (one-time setup, all screens, 2026-08-07 senior review 9-10/10 + 5 surgical refactors, polish pass, 2026-10-22 CI/CD + route-loading UX) → archived in devlog.md.
 
 ## Active tasks
+- Faro crash-telemetry beacon ✅ 2026-10-31 (commit 3d4cb05): Angular env-token carrier (analytics.ts placeholders + Dockerfile.prod sed + ci build-args), umami-mirrored. Tests 93/93 + build green. Needs repo Variables FARO_URL + FARO_APP=angulardevelopersguide.
 - ⏳ First production deploy needs the VM dirs + caddy snippet `adg.caddy` from the infra repo (family-standard, per spec).
