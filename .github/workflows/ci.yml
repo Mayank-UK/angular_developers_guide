@@ -77,6 +77,8 @@ jobs:
                   build-args: |
                       UMAMI_SRC=${{ vars.UMAMI_SRC || secrets.UMAMI_SRC || '' }}
                       UMAMI_ID=${{ vars.UMAMI_ID || secrets.UMAMI_ID || '' }}
+                      FARO_URL=${{ vars.FARO_URL || secrets.FARO_URL || '' }}
+                      FARO_APP=${{ vars.FARO_APP || secrets.FARO_APP || '' }}
 
             - name: Prepare the external compose network
               run: |
@@ -254,6 +256,8 @@ jobs:
                   build-args: |
                       UMAMI_SRC=${{ vars.UMAMI_SRC || secrets.UMAMI_SRC || '' }}
                       UMAMI_ID=${{ vars.UMAMI_ID || secrets.UMAMI_ID || '' }}
+                      FARO_URL=${{ vars.FARO_URL || secrets.FARO_URL || '' }}
+                      FARO_APP=${{ vars.FARO_APP || secrets.FARO_APP || '' }}
 
     # GHCR tag retention: every master push leaves one sha-<7> version per
     # package. This job deletes sha-tagged versions beyond the newest 10 —

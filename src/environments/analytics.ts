@@ -12,6 +12,13 @@
  * Both values are PUBLIC by design (visible in the served page source
  * anyway): they ride the GitHub repository Variables `UMAMI_SRC` /
  * `UMAMI_ID`, never secrets.
+ *
+ * The Grafana Faro crash-telemetry beacon (src/ui/analytics/crash-telemetry.ts)
+ * rides the exact same carrier: `FARO_URL` (collector endpoint) and `FARO_APP`
+ * (registered app name) tokens, swapped by the same sed, fed by the same style
+ * of repository Variables — same unset discipline (empty/unreplaced = disabled).
  */
 export const UMAMI_SRC: string = '__UMAMI_SRC__';
 export const UMAMI_ID: string = '__UMAMI_ID__';
+export const FARO_URL: string = '__FARO_URL__';
+export const FARO_APP: string = '__FARO_APP__';

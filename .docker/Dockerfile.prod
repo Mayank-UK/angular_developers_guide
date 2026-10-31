@@ -21,9 +21,14 @@ COPY . .
 # produce empty values, which the analytics module treats as unset —
 # analytics stays a complete no-op: no script tag injected, nothing sent.
 # The `|` delimiter survives the `/` and `:` in the URL values.
+# Same carrier for the Grafana Faro crash-telemetry beacon
+# (src/ui/analytics/crash-telemetry.ts): FARO_URL collector endpoint +
+# FARO_APP registered app name; empty/unreplaced = telemetry disabled.
 ARG UMAMI_SRC=""
 ARG UMAMI_ID=""
-RUN sed -i "s|__UMAMI_SRC__|${UMAMI_SRC}|g; s|__UMAMI_ID__|${UMAMI_ID}|g" src/environments/analytics.ts
+ARG FARO_URL=""
+ARG FARO_APP=""
+RUN sed -i "s|__UMAMI_SRC__|${UMAMI_SRC}|g; s|__UMAMI_ID__|${UMAMI_ID}|g; s|__FARO_URL__|${FARO_URL}|g; s|__FARO_APP__|${FARO_APP}|g" src/environments/analytics.ts
 
 RUN npm run build
 

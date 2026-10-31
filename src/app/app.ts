@@ -18,6 +18,7 @@ import {
 import { filter } from 'rxjs';
 import { ThemeToggle } from '../ui/components/theme-toggle/theme-toggle';
 import { initAnalytics, trackEvent } from '../ui/analytics/analytics';
+import { initCrashTelemetry } from '../ui/analytics/crash-telemetry';
 import { RoutePaths } from './layout/route-paths';
 
 /** The route-progress bar is revealed only after this much pending time, so
@@ -69,6 +70,11 @@ export class App {
     // — dev, test, and CI builds without the Docker build args never see a
     // script tag.
     initAnalytics();
+
+    // Grafana Faro crash-telemetry beacon: same carrier and same unset
+    // discipline as the Umami beacon above — a complete no-op unless BOTH
+    // Faro placeholder tokens were swapped by the Docker build.
+    initCrashTelemetry();
 
     this.pathname.set(this.router.url);
     this.router.events
