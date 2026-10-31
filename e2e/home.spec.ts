@@ -86,6 +86,22 @@ function isOffOriginResourceError(message: ConsoleMessage): boolean {
     );
 }
 
+/**
+ * With the REAL collector reachable, the browser instead logs a CORS error:
+ * the beacon's POST to https://faro…/collect sends a preflight, and the
+ * collector's allowed-origins cover the production hostname — NOT the CI/CI-
+ * dry-run loopback origin this suite browses from. The message names both
+ * ("Access to fetch at '<collector>' from origin '<SERVED_ORIGIN>' …"), so
+ * match on that exact shape; a CORS failure on an app-owned resource would
+ * have to be same-origin to matter, and same-origin requests don't CORS.
+ */
+function isOffOriginCorsError(message: ConsoleMessage): boolean {
+    return (
+        message.text().includes('blocked by CORS policy') &&
+        message.text().includes(`from origin '${SERVED_ORIGIN}'`)
+    );
+}
+
 test('the page boots with zero console errors', async ({ page }) => {
     const problems: string[] = [];
     page.on('console', (message) => {
@@ -94,7 +110,8 @@ test('the page boots with zero console errors', async ({ page }) => {
         }
         if (
             !isFaroBeaconNoise(message.text()) &&
-            !isOffOriginResourceError(message)
+            !isOffOriginResourceError(message) &&
+            !isOffOriginCorsError(message)
         ) {
             problems.push(message.text());
         }
