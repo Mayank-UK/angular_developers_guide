@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type ConsoleMessage } from '@playwright/test';
 
 /** The 15 section cards the home hub links out to — the guide's index. */
 const EXPECTED_SECTION_COUNT = 15;
@@ -47,15 +47,62 @@ test('the home hub renders the full guide index', async ({ page }) => {
     await expect(cards.filter({ hasText: 'Best practices' })).toBeVisible();
 });
 
+/**
+ * The Grafana Faro crash beacon (src/ui/analytics/crash-telemetry.ts) ships
+ * in the CI image, and its SDK logs an error-level console message whenever
+ * the collector endpoint is unreachable from the test browser — the e2e run
+ * must not depend on the collector's health. The SDK emits that noise
+ * itself (umami's beacon fails silently via sendBeacon, which is why it
+ * never needed this), so the gate allowlists ONLY messages that originate
+ * from the faro SDK — identified by its `@grafana/faro-web-sdk` prefix or
+ * the pinned CDN bundle in the stack trace. Everything else, including a
+ * genuine app error, still fails the test.
+ */
+function isFaroBeaconNoise(text: string): boolean {
+    return (
+        text.includes('@grafana/faro-web-sdk') ||
+        text.includes('faro-web-sdk.iife.js')
+    );
+}
+
+/**
+ * The SDK's failed collector POST also surfaces as a BARE resource error
+ * ("Failed to load resource: net::ERR_NAME_NOT_RESOLVED") whose URL lives
+ * in message.location(), not the text — so attribute it by origin: a failed
+ * load of an OFF-origin resource (the faro collector, the CDN bundle) is
+ * beacon noise; anything on the served origin is the app's own wiring and
+ * must keep failing the test.
+ */
+const SERVED_ORIGIN = new URL(
+    process.env.E2E_BASE_URL ?? 'http://127.0.0.1:8080',
+).origin;
+
+function isOffOriginResourceError(message: ConsoleMessage): boolean {
+    const url = message.location()?.url ?? '';
+    return (
+        message.text().startsWith('Failed to load resource') &&
+        url !== '' &&
+        !url.startsWith(SERVED_ORIGIN)
+    );
+}
+
 test('the page boots with zero console errors', async ({ page }) => {
     const problems: string[] = [];
     page.on('console', (message) => {
-        if (message.type() === 'error') {
+        if (message.type() !== 'error') {
+            return;
+        }
+        if (
+            !isFaroBeaconNoise(message.text()) &&
+            !isOffOriginResourceError(message)
+        ) {
             problems.push(message.text());
         }
     });
     page.on('pageerror', (error) => {
-        problems.push(String(error));
+        if (!isFaroBeaconNoise(String(error))) {
+            problems.push(String(error));
+        }
     });
 
     await page.goto('/');
